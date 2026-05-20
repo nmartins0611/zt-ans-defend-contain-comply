@@ -85,7 +85,7 @@ ansible-playbook -i inventory/hosts.ini setup/configure-aap-netbox.yml \
 # transition scripts (runtime-automation/module-0*/setup-central.sh) as
 # students advance through the lab.
 ansible-playbook -i inventory/hosts.ini setup/configure-aap-project.yml \
-    --tags templates \
+    --tags templates --skip-tags eda \
     -e "${TOKEN_VAR}"
 
 # EDA project, Decision Environment, event stream, Splunk webhook
