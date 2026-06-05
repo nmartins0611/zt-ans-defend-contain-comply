@@ -23,8 +23,6 @@ Deploying an app is where **identity (who)**, **policy (may they)**, **secrets (
 
 
 == Exercise 2.1
-[%collapsible]
-=====
 
 [TIP]
 .Separation of concerns in templates
@@ -81,11 +79,8 @@ The roles are now allocated. You can log out of the platform.
 **Check DB Access Policy runs first** on purpose: if the human (via AAP) isn't entitled to database credentials, the workflow **never touches Vault**. That's *defense in depth*—the secret manager isn't a substitute for authorization. In breach terms, an attacker who tricks someone into clicking "deploy" still hits a **PDP (OPA)** before any **secret issuance**.
 ====
 
-=====
-
 == Exercise 2.2
-[%collapsible]
-=====
+
 . Log in to AAP as `neteng`. Notice you have no permissions. You're just a member of the Organization.
 
 . Navigate to the IDM tab and log in with the admin details.
@@ -239,8 +234,6 @@ curl -s http://app.zta.lab:8081/health | python3 -m json.tool
 ----
 
 The application is no longer healthy. The time-limited credentials have expired. Refresh the 'Global Telemetry Platform' web page and you'll see a database connection error. 
-
-=====
 
 [TIP]
 .The 503 is Zero Trust working as intended
