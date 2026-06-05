@@ -101,9 +101,6 @@ Until AAP is wired to the same **identity, policy, secrets, and inventory truth*
 
 == Exercise 1.1 — Verify AAP credentials (pre-configured, Vault-sourced)
 
-[%collapsible]
-====
-
 
 To save time, workshop credentials have been created already. You'll **confirm** Vault KV data and controller objects match the requirements for this lab.
 
@@ -142,7 +139,7 @@ vault kv get secret/network/arista
 vault kv get secret/db/admin
 ----
 
-[source,role="execute"]
+[source]
 ----
 Key                    Value
 ---                    -----
@@ -229,7 +226,7 @@ By inspecting both sides—Vault KV data *and* AAP lookup metadata—you're prac
 
 === Step 2 — Confirm credentials in the controller
 
-Navigate to the Automation controller tab and login using the supplied credentials: 'admin/ansible123'
+Navigate to the Automation controller tab and login using the supplied credentials: 'admin/ansible123!'
 
 Open **Automation Execution** -> **Infrastructure** -> **Credentials** and verify these names exist.
 
@@ -247,7 +244,7 @@ We use Hashivault in this workshop so we can lookup credentials and keep credent
 
 Edit the 'ZTA Vault Credential', you will see there is a 'Test' button next to the save at the bottom. Click 'Test' 
 
-This allows us to test the lookup provided we give the correct details. These are the details we recieved earlier in the exercise.
+This allows us to test the lookup provided we give the correct details. These are the details we received earlier in the exercise.
 
 [source,role="execute"]
 ----
@@ -289,14 +286,12 @@ Click 'Run' to see if the lookup is working. You can now attempt with the other 
 | ZTA NetBox | NetBox | Token in AAP
 | ZTA Vault SSH | Vault Signed SSH | AppRole + `ssh-signer`
 |===
-====
 
 
 [[exercise-1-2-idm-ldap-authentication-methods]]
 == Exercise 1.2 — IdM LDAP (Authentication Methods UI)
 
-[%collapsible]
-====
+
 
 Create LDAP authentication:
 
@@ -373,7 +368,7 @@ image::s01p01.png[Authentication method mapping configuration interface,link=sel
 
 
 
- **Organisation and team mapping**
+**Organisation and team mapping**
 
 **Why authenticator mapping matters for Zero Trust**
 
@@ -449,7 +444,7 @@ image::s01p03.png[Mapping details screen showing completed organization member m
 image::s01p04.png[Organization admin mapping configuration for zta-admins group,link=self,window=blank]
 
 
-. **Superuser (Group)** — :
+. **Superuser (Group)** — grants superuser flag to `zta-admins`:
 
 +
 [cols="2,3",options="header"]
@@ -479,7 +474,7 @@ Below is an example for the Infrastructure team. **Create this and continue with
 
 |===
 
-. **Infrastructure (Group)** — :
+. **Infrastructure (Group)** — example team mapping:
 
 +
 [cols="2,3",options="header"]
@@ -503,7 +498,6 @@ image::s01p05.png[Team mapping configuration showing Infrastructure team mapping
 . In the AAP tab, select the 'admin' user in the top right and sign out. Log in as **`ztauser`** / `ansible123!`.
 . Confirm the user lands on a populated dashboard.
 . Check that team membership is visible under **Access Management** → **Users** → `ztauser` → **Teams**.
-====
 
 This workshop also has a CMDB as a source of truth, If you navigate to the Netbox tab and login with the credentials 'admin/netbox'. Navigate to 'Sites' -> 'Sites' and select 'ZTA Workshop Lab'. You will be able to view the devices and configurations of the VLANS. Clicking on VLANs we can see we have three VLANS configured on our network. App-tier, Data-tier and a Management VLAN. We will interact with this later in the workshop.
 
@@ -518,8 +512,6 @@ image::s01p06.png[NetBox VLAN configuration showing App-tier Data-tier and Manag
 
 == Exercise 1.3 — Verify ZTA services
 
-[%collapsible]
-====
 [TIP]
 .Never trust, always verify
 =====
@@ -531,13 +523,10 @@ Navigate back to AAP and to Automation Execution -> Templates on the automation 
 Run **Verify ZTA Services** by clicking on the rocket on the right of the template.
 
 Inspect the output. At the bottom there's a summary of the checks. If successful, you can proceed.
-====
 
 
 == Exercise 1.4 — Test Vault integration
 
-[%collapsible]
-====
 [TIP]
 .Short-lived database identities
 =====
@@ -560,13 +549,10 @@ ok: [vault] => {
 ]
 }
 ----
-====
 
 
 == Exercise 1.5 — Test Vault SSH certificates
 
-[%collapsible]
-====
 [TIP]
 .Cryptographic proof of permission to log in
 =====
@@ -602,12 +588,10 @@ Navigate back to AAP and run **Test Vault SSH Certificates**. Observe CA-signed 
 =====
 **Signed SSH certificates** are the Zero Trust answer to shared static keys.
 =====
-====
+
 
 == Exercise 1.6 — Test OPA policy
 
-[%collapsible]
-====
 [TIP]
 .Deny by default (PDP)
 =====
@@ -629,7 +613,7 @@ ok: [central] => {
 "Test 5 — DB (app-deployer): ALLOW",
 "Zero Trust: deny-by-default, policy-driven access."
 ]
+}
 ----
 
 If all tests were successful, you can move on to the next exercise.
-====
