@@ -39,8 +39,6 @@ The gateway policy uses **resource metadata** (here, template name substrings) a
 ====
 
 == Exercise 3.1
-[%collapsible]
-====           
 
 To configure AAP, navigate to 'Settings' -> 'Automation Execution' -> 'Policy'.
 Configure OPA on the platform. Select 'Edit' and provide the following details:
@@ -74,7 +72,6 @@ This job cannot be executed due to a policy violation or error. See the followin
 '{"Infrastructure", "Security"}, has: '
 '{"Applications"})']}}
 ----
-====
 
 [TIP]
 .Stronger than hiding buttons
@@ -83,8 +80,7 @@ Traditional RBAC might hide templates or rely on operator discipline. **Policy a
 ====
 
 == Exercise 3.2
-[%collapsible]
-====         
+
 Log in to the platform as a user (netadmin) that's in the Infrastructure team or add appdev to the infrastructure team.
 
 Trigger the 'Apply Security Patch' template. It should succeed. 
@@ -105,7 +101,6 @@ ok: [app] => {
 ]
 }
 ----
-====
 
 [TIP]
 .Identity lifecycle, not ticket forever
