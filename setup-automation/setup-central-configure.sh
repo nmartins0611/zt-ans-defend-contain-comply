@@ -15,13 +15,13 @@ PLAYBOOK_DIR="/tmp/zta-workshop-aap"
 cd "${PLAYBOOK_DIR}" || { echo "ERROR: Cannot cd to ${PLAYBOOK_DIR}"; exit 1; }
 
 ansible-playbook -i inventory/hosts.ini setup/configure-firewall.yml
-ansible-playbook -i inventory/hosts.ini setup/configure-container-networking.yml
-ansible-playbook -i inventory/hosts.ini setup/configure-vault.yml
-ansible-playbook -i inventory/hosts.ini setup/configure-vault-ssh.yml
-ansible-playbook -i inventory/hosts.ini setup/configure-netbox.yml
+#ansible-playbook -i inventory/hosts.ini setup/configure-container-networking.yml
+#ansible-playbook -i inventory/hosts.ini setup/configure-vault.yml
+#ansible-playbook -i inventory/hosts.ini setup/configure-vault-ssh.yml
+#ansible-playbook -i inventory/hosts.ini setup/configure-netbox.yml
 ansible-playbook -i inventory/hosts.ini setup/integrate-splunk.yml --skip-tags arista_syslog,wazuh_splunk
-ansible-playbook -i inventory/hosts.ini setup/configure-aap-podman-gateway-prereqs.yml
-ansible-playbook -i inventory/hosts.ini setup/deploy-spire.yml 
+#ansible-playbook -i inventory/hosts.ini setup/configure-aap-podman-gateway-prereqs.yml
+#ansible-playbook -i inventory/hosts.ini setup/deploy-spire.yml 
 ansible-playbook -i inventory/hosts.ini setup/configure-opa-base.yml
 ansible-playbook -i inventory/hosts.ini setup/deploy-splunk.yml --skip-tags eda_webhook
 echo ""
