@@ -275,7 +275,7 @@ for container_name in db app; do
     fi
 done
 
-ansible-playbook -i inventory/hosts.ini setup/deploy-db-app.yml
+#ansible-playbook -i inventory/hosts.ini setup/deploy-db-app.yml
 
 echo ""
 echo "central bootstrap phase complete"
