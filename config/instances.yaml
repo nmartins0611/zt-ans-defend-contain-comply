@@ -176,7 +176,7 @@ virtualmachines:
         targetPort: 8200
         tls: true
         tls_termination: Edge
-    userdata: >-
+    userdata: |-
       #cloud-config
       user: rhel
       password: ansible123!
