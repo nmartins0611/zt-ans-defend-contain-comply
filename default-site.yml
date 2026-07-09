@@ -1,7 +1,7 @@
 ---
 site:
-  title: Implementing Zero Trust with Ansible Automation Platform
-  url: https://rhpds.github.io/zt-ans-bu-hashi-aap/modules/index.html
+  title: "Defend, Contain, Comply"
+  url: https://rhpds.github.io/zt-ans-defend-contain-comply/modules/index.html
   start_page: modules::index.adoc
 
 content:

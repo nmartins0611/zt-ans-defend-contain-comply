@@ -4,64 +4,39 @@ antora:
   dir: www
   modules:
     - name: index
-      label: "The day the application died"
+      label: "Introduction"
       solveButton: false
     - name: module-01
-      label: "Verify ZTA + AAP integration"
+      label: "DEFEND: Vulnerability Response"
       solveButton: false
     - name: module-02
-      label: "Short-lived credentials"
+      label: "CONTAIN: Policy-Gated Patching"
       solveButton: false
     - name: module-03
-      label: "Policy as Code patching"
+      label: "COMPLY: Container Supply Chain"
       solveButton: false
-    - name: module-04
-      label: "SPIFFE VLAN management"
+    - name: conclusion
+      label: "Conclusion"
       solveButton: false
-    - name: module-05
-      label: "Splunk → EDA → Vault"
-      solveButton: false
-    # - name: module-06
-    #   label: "SSH lockdown & break-glass"
-    #   solveButton: false      
-    # - name: module-07
-    #   label: "Wazuh"
-    #   solveButton: false      
-      
-#type: showroom
+
 tabs:
-  - name: Lab Topology
-    url: https://dashboard-http-${guid}.${domain}
-    external: false
-  - name: Ansible Automation Platform
-    url: https://control-${guid}.${domain}/
-    external: false
   - name: "Terminal"
     url: /wetty_central
-  - name: IDM
-    url: https://idm-https-${guid}.${domain}/ipa/ui/
+  - name: AAP Controller
+    url: https://control-${guid}.${domain}/
     external: false
-  - name: Netbox
-    url: https://netbox-${guid}.${domain}
+  - name: EDA Controller
+    url: https://eda-${guid}.${domain}/
     external: false
-  # - name: Keycloak
-  #   url: https://keycloak-https-${guid}.${domain}
-  #   external: true
+  - name: Splunk
+    url: https://splunk-http-${guid}.${domain}
+    external: true
   - name: OPA
     url: https://opa-http-${guid}.${domain}
     external: false
   - name: HashiCorp Vault
     url: https://vault-${guid}.${domain}/ui/vault/unseal
     external: true
-  # - name: Wazuh
-  #   url: https://wazuh-${guid}.${domain}
-  #   external: false
   - name: Gitea
     url: https://gitea-${guid}.${domain}/
     external: false
-  - name: Splunk
-    url: https://splunk-http-${guid}.${domain}
-    external: true
-  - name: Global Telemetry Platform
-    url: https://app-http-${guid}.${domain}
-    external: true

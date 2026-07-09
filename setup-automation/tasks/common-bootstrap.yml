@@ -16,15 +16,18 @@
   register: r_selinux
   changed_when: false
 
-- name: Set SELinux to permissive
+- name: Set SELinux to permissive (infrastructure hosts only)
   ansible.builtin.command: setenforce 0
-  when: r_selinux.stdout == 'Enforcing'
+  when:
+    - r_selinux.stdout == 'Enforcing'
+    - selinux_mode | default('permissive') == 'permissive'
   changed_when: true
 
-- name: Stop firewalld
+- name: Stop firewalld (infrastructure hosts only)
   ansible.builtin.systemd:
     name: firewalld
     state: stopped
+  when: selinux_mode | default('permissive') == 'permissive'
   failed_when: false
 
 - name: Populate /etc/hosts entries

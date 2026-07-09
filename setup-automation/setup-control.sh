@@ -98,32 +98,21 @@ run_if_needed "Install base packages" \
     -- \
     dnf install -y dnf-utils git nano
 
-run_if_needed "Install IPA client packages" \
-    rpm -q ipa-client \
-    -- \
-    dnf install -y ipa-client sssd oddjob-mkhomedir
-
-run_if_needed "Install Python3 libraries" \
-    rpm -q python3-libsemanage \
-    -- \
-    dnf install -y python3-libsemanage
-
 ###############################################################################
-# 5. Clone workshop repo (idempotent)
+# 5. Clone DCC content repo (idempotent)
 ###############################################################################
 
-if [ -d /tmp/zta-workshop-aap/.git ]; then
-    echo "INFO: /tmp/zta-workshop-aap exists, pulling latest main"
-    git -C /tmp/zta-workshop-aap pull --ff-only origin main
+DCC_REPO="/tmp/dcc-workshop"
+
+if [ -d "${DCC_REPO}/.git" ]; then
+    echo "INFO: ${DCC_REPO} exists, pulling latest"
+    git -C "${DCC_REPO}" pull --ff-only origin master || true
 else
-    rm -rf /tmp/zta-workshop-aap
-    retry "Clone ZTA workshop repo" \
-        git clone -b main https://github.com/rhpds/lb2864-zta-aap-automation.git /tmp/zta-workshop-aap
+    rm -rf "${DCC_REPO}"
+    retry "Clone DCC content repo" \
+        git clone -b master https://github.com/nmartins-redhat/defend-contain-comply.git "${DCC_REPO}"
 fi
 
-# Ensure Ansible SSH ControlPath and fact-cache dirs are owned by the run user.
-# ansible.cfg sets control_path_dir=/tmp/.ansible-cp; if provisioning runs as
-# root first and creates the directory, subsequent rhel-user runs will fail.
 mkdir -p /tmp/.ansible-cp /tmp/.ansible-fact-cache
 chmod 700 /tmp/.ansible-cp /tmp/.ansible-fact-cache
 
@@ -134,45 +123,26 @@ chmod 700 /tmp/.ansible-cp /tmp/.ansible-fact-cache
 tee /tmp/requirements.yml > /dev/null <<EOF
 ---
 collections:
-  - name: cisco.ios
-  - name: arista.eos
-  - name: ansible.netcommon
-  - name: community.postgresql
-  - name: community.general
-  - name: redhat.rhel_idm
-  - name: netbox.netbox
-  - name: containers.podman
   - name: ansible.controller
   - name: ansible.posix
-
+  - name: ansible.utils
+  - name: containers.podman
+  - name: community.general
+  - name: redhat.rhel_system_roles
 EOF
 
 run_if_needed "Install Ansible collections" \
-    bash -c 'ansible-galaxy collection list | grep -q "arista.eos"' \
+    bash -c 'ansible-galaxy collection list | grep -q "ansible.posix"' \
     -- \
     ansible-galaxy install -r /tmp/requirements.yml
 
-# If ansible.controller was not installed from Automation Hub (e.g. token
-# expired or unavailable), create a namespace symlink so that awx.awx
-# (installed from Galaxy) serves the ansible.controller FQCN.  Both the
-# module names (ansible.controller.*) and module_defaults group resolution
-# (group/ansible.controller.controller:) work via this symlink because
-# Ansible uses path-based collection lookup; awx.awx defines the same
-# action_groups.controller entries as ansible.controller.
+# awx.awx fallback for ansible.controller
 if ! ansible-galaxy collection list 2>/dev/null | grep -q "ansible.controller"; then
     echo "INFO: ansible.controller not found; symlinking awx.awx as ansible.controller"
     mkdir -p ~/.ansible/collections/ansible_collections/ansible
     ln -sfn ~/.ansible/collections/ansible_collections/awx/awx \
             ~/.ansible/collections/ansible_collections/ansible/controller
 fi
-
-# paramiko is required by arista.eos for direct SSH to cEOS switches
-run_if_needed "Install paramiko" \
-    bash -c 'python3 -c "import paramiko" 2>/dev/null' \
-    -- \
-    bash -c 'dnf install -y python3-pip 2>/dev/null; python3 -m pip install paramiko'
-
-cp /tmp/zta-workshop-aap/ansible.cfg /etc/ansible/
 
 echo ""
 echo "control bootstrap phase complete"

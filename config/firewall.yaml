@@ -1,58 +1,20 @@
 ---
-# ZTA Workshop — Network Policy
-# Central: 192.168.1.11 (IdM, containers, SIEM, switches)
-# AAP:     192.168.1.10 (Ansible Automation Platform)
-# Vault:   vault.zta.lab (HashiCorp Vault)
-# Netbox:  netbox.zta.lab (CMDB)
+# DCC Workshop — Network Policy
+# Control: AAP Controller + EDA
+# Central: Splunk, OPA, Errata Repo
+# Vault:   HashiCorp Vault
+# rhel01:  App Server
+# rhel02:  Spare
 
 ingress:
 - ports:
   # ── General ──
   - protocol: TCP
-    port: 22       # SSH (central host)
+    port: 22       # SSH
   - protocol: TCP
-    port: 80       # HTTP (IdM web UI)
+    port: 80       # HTTP
   - protocol: TCP
-    port: 443      # HTTPS (IdM web UI, AAP)
-  - protocol: TCP
-    port: 123      # NTP
-  # ── IdM / Kerberos / LDAP ──
-  - protocol: TCP
-    port: 88       # Kerberos KDC
-  - protocol: TCP
-    port: 389      # LDAP
-  - protocol: TCP
-    port: 464      # Kerberos kpasswd
-  - protocol: TCP
-    port: 636      # LDAPS
-  # ── Arista cEOS switches (SSH) ──
-  - protocol: TCP
-    port: 2001     # ceos1 SSH
-  - protocol: TCP
-    port: 2002     # ceos2 SSH
-  - protocol: TCP
-    port: 2003     # ceos3 SSH
-  # ── Arista cEOS switches (eAPI) ──
-  - protocol: TCP
-    port: 6031     # ceos1 eAPI
-  - protocol: TCP
-    port: 6032     # ceos2 eAPI
-  - protocol: TCP
-    port: 6033     # ceos3 eAPI
-  # ── RHEL containers ──
-  - protocol: TCP
-    port: 2022     # DB container SSH
-  - protocol: TCP
-    port: 2023     # App container SSH
-  - protocol: TCP
-    port: 5432     # PostgreSQL (DB container)
-  - protocol: TCP
-    port: 8081     # Global Telemetry Platform (App container)
-  # ── Keycloak ──
-  - protocol: TCP
-    port: 8180     # Keycloak HTTP
-  - protocol: TCP
-    port: 8543     # Keycloak HTTPS
+    port: 443      # HTTPS (AAP Controller)
   # ── OPA ──
   - protocol: TCP
     port: 8181     # OPA policy API
@@ -65,36 +27,22 @@ ingress:
     port: 8089     # Splunk management API
   - protocol: TCP
     port: 9997     # Splunk forwarder receiver
-  # ── Wazuh ──
-  - protocol: UDP
-    port: 514      # Wazuh syslog collection (Arista, hosts)
-  - protocol: TCP
-    port: 1514     # Wazuh agent communication
-  - protocol: TCP
-    port: 1515     # Wazuh agent enrollment
-  - protocol: TCP
-    port: 5601     # Wazuh Dashboard
-  - protocol: TCP
-    port: 9200     # Wazuh Indexer (OpenSearch)
-  - protocol: TCP
-    port: 55000    # Wazuh Manager API
   # ── Vault ──
   - protocol: TCP
     port: 8200     # Vault API
   - protocol: TCP
     port: 8201     # Vault cluster
-  # ── Netbox ──
-  - protocol: TCP
-    port: 8880     # Netbox web UI
   # ── Gitea ──
   - protocol: TCP
     port: 3000     # Gitea web UI
-  # ── AAP ──
+  # ── EDA ──
   - protocol: TCP
-    port: 5000     # EDA Controller (webhook)
-  # ── ZTA Dashboard ──
+    port: 5000     # EDA webhook endpoint
   - protocol: TCP
-    port: 5050     # Live Topology Dashboard
+    port: 8443     # EDA Controller UI
+  # ── Errata Repo ──
+  - protocol: TCP
+    port: 8085     # DCC errata yum repo on central
   - from:
       - podSelector:
           matchLabels:
@@ -108,45 +56,6 @@ egress:
     port: 80       # HTTP
   - protocol: TCP
     port: 443      # HTTPS
-  - protocol: TCP
-    port: 123      # NTP
-  # ── IdM / Kerberos / LDAP ──
-  - protocol: TCP
-    port: 88       # Kerberos KDC
-  - protocol: TCP
-    port: 389      # LDAP
-  - protocol: TCP
-    port: 464      # Kerberos kpasswd
-  - protocol: TCP
-    port: 636      # LDAPS
-  # ── Arista cEOS switches (SSH) ──
-  - protocol: TCP
-    port: 2001     # ceos1 SSH
-  - protocol: TCP
-    port: 2002     # ceos2 SSH
-  - protocol: TCP
-    port: 2003     # ceos3 SSH
-  # ── Arista cEOS switches (eAPI) ──
-  - protocol: TCP
-    port: 6031     # ceos1 eAPI
-  - protocol: TCP
-    port: 6032     # ceos2 eAPI
-  - protocol: TCP
-    port: 6033     # ceos3 eAPI
-  # ── RHEL containers ──
-  - protocol: TCP
-    port: 2022     # DB container SSH
-  - protocol: TCP
-    port: 2023     # App container SSH
-  - protocol: TCP
-    port: 5432     # PostgreSQL (DB container)
-  - protocol: TCP
-    port: 8081     # Global Telemetry Platform (App container)
-  # ── Keycloak ──
-  - protocol: TCP
-    port: 8180     # Keycloak HTTP
-  - protocol: TCP
-    port: 8543     # Keycloak HTTPS
   # ── OPA ──
   - protocol: TCP
     port: 8181     # OPA policy API
@@ -159,36 +68,22 @@ egress:
     port: 8089     # Splunk management API
   - protocol: TCP
     port: 9997     # Splunk forwarder receiver
-  # ── Wazuh ──
-  - protocol: UDP
-    port: 514      # Wazuh syslog collection (Arista, hosts)
-  - protocol: TCP
-    port: 1514     # Wazuh agent communication
-  - protocol: TCP
-    port: 1515     # Wazuh agent enrollment
-  - protocol: TCP
-    port: 5601     # Wazuh Dashboard
-  - protocol: TCP
-    port: 9200     # Wazuh Indexer (OpenSearch)
-  - protocol: TCP
-    port: 55000    # Wazuh Manager API
   # ── Vault ──
   - protocol: TCP
     port: 8200     # Vault API
   - protocol: TCP
     port: 8201     # Vault cluster
-  # ── Netbox ──
-  - protocol: TCP
-    port: 8880     # Netbox web UI
   # ── Gitea ──
   - protocol: TCP
     port: 3000     # Gitea web UI
-  # ── AAP ──
+  # ── EDA ──
   - protocol: TCP
-    port: 5000     # EDA Controller (webhook)
-  # ── ZTA Dashboard ──
+    port: 5000     # EDA webhook endpoint
   - protocol: TCP
-    port: 5050     # Live Topology Dashboard
+    port: 8443     # EDA Controller UI
+  # ── Errata Repo ──
+  - protocol: TCP
+    port: 8085     # DCC errata yum repo on central
   - to:
       - podSelector:
           matchLabels:

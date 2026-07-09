@@ -46,8 +46,8 @@ containers:
       - >
         curl -X POST -H "accept: application/json" -H "Content-Type:
         application/json" -u 'gitea:ansible123!' -d '{"clone_addr":
-        "https://github.com/rhpds/lb2864-zta-aap-automation.git", "repo_name":
-        "zta-workshop-aap", "owner": "gitea", "private": false}'
+        "https://github.com/nmartins-redhat/defend-contain-comply.git", "repo_name":
+        "defend-contain-comply", "owner": "gitea", "private": false}'
         http://localhost:3000/api/v1/repos/migrate
     memory: 4Gi
     services:
@@ -90,12 +90,18 @@ virtualmachines:
             protocol: TCP
             targetPort: 443
             name: control-https
-      - name: control-report
+      - name: eda-webhook
         ports:
-          - port: 8088
+          - port: 5000
             protocol: TCP
-            targetPort: 8088
-            name: control-report
+            targetPort: 5000
+            name: eda-webhook
+      - name: eda-ui
+        ports:
+          - port: 8443
+            protocol: TCP
+            targetPort: 8443
+            name: eda-ui
     routes:
       - name: control-https
         host: control
@@ -138,10 +144,10 @@ virtualmachines:
           wMQ+MKwOpgDyuy79XKvsPanlAfP8WgJi79pJdHu3BGTLlDFil9CK8l2sncM1FdaE
           57Ys1npOUx+oxw==
           -----END CERTIFICATE-----
-      - name: control-report
-        host: control-report
-        service: control-report
-        targetPort: 8088
+      - name: eda-ui
+        host: eda
+        service: eda-ui
+        targetPort: 8443
         tls: true
         tls_termination: Edge
 
@@ -220,10 +226,10 @@ virtualmachines:
         - systemctl reload sshd        
 
   - name: "central"
-    image: "zta-central-img-v1.3"
-    memory: "32G"
-    cores: 8
-    image_size: "70Gi"
+    image: "rhel-9.5"
+    memory: "8G"
+    cores: 4
+    image_size: "30Gi"
     tags:
       - key: "AnsibleGroup"
         value: "isolated"
@@ -231,7 +237,14 @@ virtualmachines:
       - default
       - secondary
     services:
-        # ── OPA ──
+      # ── Errata Repo ──
+      - name: errata-repo
+        ports:
+          - port: 8085
+            protocol: TCP
+            targetPort: 8085
+            name: errata-repo
+      # ── OPA ──
       - name: opa-http
         ports:
           - port: 8181

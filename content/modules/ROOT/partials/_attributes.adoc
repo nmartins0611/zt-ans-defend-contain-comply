@@ -1,0 +1,2 @@
+// Attributes are defined in content/antora.yml
+// This file exists so that include::partial$_attributes.adoc[] does not fail.
