@@ -6,7 +6,7 @@ export ANSIBLE_LOCALHOST_WARNING=False
 export ANSIBLE_INVENTORY_UNPARSED_WARNING=False
 export ANSIBLE_HOST_KEY_CHECKING=False
 
-AAP_HOST="https://control.dcc.lab"
+AAP_HOST="https://control"
 AAP_USER="admin"
 AAP_PASS="ansible123!"
 

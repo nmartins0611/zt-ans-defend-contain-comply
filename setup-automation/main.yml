@@ -93,15 +93,15 @@
     tmm_id: "{{ tmm_activation }}"
     hosts_entries:
       - ip: 192.168.1.10
-        names: control.dcc.lab control
+        names: control
       - ip: 192.168.1.11
-        names: central.dcc.lab central splunk.dcc.lab opa.dcc.lab
+        names: central
       - ip: 192.168.1.12
-        names: vault.dcc.lab vault
+        names: vault
       - ip: 192.168.1.13
-        names: rhel01.dcc.lab rhel01
+        names: rhel01
       - ip: 192.168.1.14
-        names: rhel02.dcc.lab rhel02
+        names: rhel02
   tasks:
     - name: Wait for SSH
       ansible.builtin.wait_for_connection:
