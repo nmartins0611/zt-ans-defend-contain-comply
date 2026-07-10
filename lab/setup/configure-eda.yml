@@ -29,6 +29,20 @@
       register: _eda_ready
       until: _eda_ready is succeeded
 
+    # ── EDA Organization lookup ────────────────────────────────────────
+    - name: Get Default organization ID
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/organizations/?name=Default"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _eda_org
+
+    - name: Set EDA organization ID fact
+      ansible.builtin.set_fact:
+        eda_org_id: "{{ _eda_org.json.results[0].id }}"
+
     # ── AAP Controller token for EDA ──────────────────────────────────
     - name: Generate AAP Controller token for EDA
       ansible.builtin.uri:
@@ -66,6 +80,7 @@
         body_format: json
         body:
           name: "DCC Controller Token"
+          organization_id: "{{ eda_org_id }}"
           credential_type_id: 1
           inputs:
             host: "{{ aap_host }}"
@@ -95,6 +110,7 @@
         body_format: json
         body:
           name: "{{ workshop_project_name }}"
+          organization_id: "{{ eda_org_id }}"
           url: "{{ gitea_url }}/{{ gitea_repo }}.git"
           scm_branch: dev
         status_code: [201]
@@ -148,6 +164,7 @@
         body_format: json
         body:
           name: "DCC Splunk Events"
+          organization_id: "{{ eda_org_id }}"
           eda_credential_id: "{{ _cred_lookup.json.results[0].id }}"
           event_stream_type: "basic"
           test_mode: false
@@ -184,6 +201,7 @@
         body_format: json
         body:
           name: "DCC CVE Alert Responder"
+          organization_id: "{{ eda_org_id }}"
           project_id: "{{ eda_project_id }}"
           rulebook: "lab/rulebooks/splunk-cve-alert.yml"
           decision_environment_id: "{{ _de_list.json.results[0].id }}"

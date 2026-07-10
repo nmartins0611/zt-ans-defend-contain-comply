@@ -17,14 +17,14 @@ In this module you will build and execute a policy-gated patching workflow in AA
 
 By the end of this module, you'll be able to:
 
+* Write an Ansible playbook that queries OPA for policy decisions
 * Construct a multi-node AAP workflow with approval gates
-* Implement policy-as-code checks as pre-patch prerequisites
-* Execute a patching workflow with rollback awareness
+* Execute a patching workflow with policy enforcement
 * Generate compliance evidence as a workflow artifact
 
 == Exercise 1: Examine the Patch Policy
 
-Before building the workflow, understand the policies that govern patching at Meridian Financial.
+Before writing the playbook, understand the policies that govern patching at Meridian Financial.
 
 . From the terminal, review the patch policy definition:
 +
@@ -33,7 +33,7 @@ Before building the workflow, understand the policies that govern patching at Me
 cat /var/lib/awx/projects/defend-contain-comply/lab/policies/patch-policy.yml
 ----
 +
-Note the five gates: maintenance window, backup verification, disk space, service health, and change approval.
+Note the four automatable gates: maintenance window, backup verification, disk space, and service health. The fifth gate (change approval) is enforced by an AAP approval node.
 
 . Verify the current backup state (simulated — create the marker):
 +
@@ -44,56 +44,135 @@ sudo touch /var/log/last-backup-timestamp
 +
 This simulates a successful backup completing within the policy window.
 
-. Check available disk space:
+. Verify OPA is running and the patch policy is loaded:
 +
 [source,role="execute"]
 ----
-df -h /
+curl -s http://central:8181/v1/policies | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for p in data.get('result', []):
+    print(f\"  {p['id']}\")
+"
 ----
 
 === Verify
 
-The patch policy defines clear, automatable prerequisites. The backup marker exists and disk space exceeds the 2GB minimum.
+The patch policy defines clear, automatable prerequisites. The backup marker exists and OPA has the `dcc/patch_policy` rules loaded.
 
-== Exercise 2: Build the Patching Workflow in AAP Controller
+== Exercise 2: Write the Pre-Patch Policy Check Playbook
 
-Now construct the workflow that enforces these policies.
+You will write a playbook that gathers system facts, sends them to OPA for evaluation, and blocks patching if any policy gates fail. A skeleton file with detailed instructions has been provided.
 
-. In AAP Controller, navigate to **Resources → Workflow Templates** and open the pre-configured "Policy-Gated Patching" workflow.
-
-. Examine the workflow topology. It should contain these nodes in order:
+. Examine the exercise skeleton:
 +
-* **Pre-Patch Policy Check** (job template) — runs `pre-patch-check.yml`
-* **Approval: Change Advisory Board** (approval node) — requires manual approval
-* **Apply Security Patch** (job template) — runs `patch-system.yml`
-* **Post-Patch Verification** (job template) — runs `post-patch-verify.yml`
-* **Generate Compliance Report** (job template) — runs `report-compliance.yml`
+[source,role="execute"]
+----
+cat /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/pre-patch-check-exercise.yml
+----
++
+Read the comments carefully — they describe the OPA input payload format and the expected response structure.
 
-. Note the convergence links:
-* Pre-Patch Policy Check → **on success** → Approval node
-* Pre-Patch Policy Check → **on failure** → notification (policy violation)
-* Approval → **on approve** → Apply Security Patch
-* Apply Security Patch → **on success** → Post-Patch Verification
-* Post-Patch Verification → **on success** → Generate Compliance Report
+. Copy the exercise file to work on it:
++
+[source,role="execute"]
+----
+cp /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/pre-patch-check-exercise.yml \
+   /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/my-pre-patch-check.yml
+----
 
-. Launch the workflow by clicking **Launch**.
+. Edit the file and complete all the TODO tasks:
++
+[source,role="execute"]
+----
+vi /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/my-pre-patch-check.yml
+----
++
+[TIP]
+====
+The key steps are:
+
+. Use `ansible.builtin.stat` to get the backup marker's mtime, then calculate age in hours
+. Use `ansible.builtin.systemd` to check httpd's ActiveState
+. Get free disk space from `ansible_mounts` (filter for `mount == "/"`, divide `size_available` by 1073741824)
+. POST the four values to `http://central:8181/v1/data/dcc/patch_policy/result` using `ansible.builtin.uri`
+. Use `ansible.builtin.fail` with `when: not _opa_response.json.result.allow_patch` to enforce the policy
+====
+
+. Test your playbook:
++
+[source,role="execute"]
+----
+cd /var/lib/awx/projects/defend-contain-comply/lab
+ansible-playbook playbooks/contain/my-pre-patch-check.yml -i inventory/workshop.yml
+----
+
+. If you get stuck, the solution is available:
++
+[source,role="execute"]
+----
+cat /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/pre-patch-check.yml
+----
 
 === Verify
 
-The workflow should pause at the Approval node waiting for your authorization.
+Your playbook should:
 
-== Exercise 3: Approve and Patch
+* Query OPA and display all gate results (PASS/FAIL)
+* Complete successfully when all gates pass
+* Show the number of passed gates (4/4)
 
-. In the running workflow job, click the **Approval** node and select **Approve**.
+== Exercise 3: Build the Patching Workflow in AAP Controller
+
+Now construct the workflow that chains the policy check, approval, patching, and reporting.
+
+. In AAP Controller, navigate to **Resources → Templates** and click **Add → Add workflow template**:
++
+* Name: `Policy-Gated Patching`
+* Organization: `Default`
+* Inventory: `DCC Workshop`
+* Click **Save**
+
+. Open the **Visualizer** and add workflow nodes in this order:
++
+[cols="1,2,2"]
+|===
+| Step | Node Type | Template
+
+| 1 | Job Template | Pre-Patch Check
+| 2 | Approval | Name: "Approve Patch Application", Timeout: 900s
+| 3 | Job Template | Patch System
+| 4 | Job Template | Post-Patch Verify
+| 5 | Job Template | Report Compliance
+|===
+
+. Connect the nodes with **On Success** links:
++
+* Pre-Patch Check → *on success* → Approve Patch Application
+* Approve Patch Application → *on approve* → Patch System
+* Patch System → *on success* → Post-Patch Verify
+* Post-Patch Verify → *on success* → Report Compliance
+
+. Click **Save** in the Visualizer.
+
+=== Verify
+
+The workflow visualizer should show five nodes connected in a linear chain with an approval gate between the policy check and the patch application.
+
+== Exercise 4: Execute the Patching Workflow
+
+. Launch the workflow by clicking **Launch**.
+
+. The workflow will pause at the Approval node. Click the **Approval** node and select **Approve**.
 +
 This simulates the Change Advisory Board sign-off.
 
 . Watch the workflow proceed through the remaining nodes:
-* Apply Security Patch — installs `httpd-2.4.62-1.el9`
-* Post-Patch Verification — confirms CVE is resolved
-* Generate Compliance Report — produces HTML artifact
+* Patch System — installs `httpd-2.4.62-1.el9`
+* Post-Patch Verify — confirms CVE is resolved
+* Report Compliance — produces HTML artifact
 
-. Once complete, examine the patch application from the terminal:
+. Once complete, verify from the terminal:
 +
 [source,role="execute"]
 ----
@@ -115,7 +194,7 @@ yum updateinfo list cves 2>/dev/null | grep CVE-2024-38476 || echo "CVE-2024-384
 * CVE-2024-38476 no longer appears in pending advisories
 * Workflow completed all nodes successfully
 
-== Exercise 4: Review the Compliance Report
+== Exercise 5: Review the Compliance Report
 
 The final workflow node generated an HTML compliance report.
 
@@ -151,7 +230,7 @@ The compliance report contains:
 * Firewall configuration
 * Complete remediation timestamp
 
-== Exercise 5: Test Policy Violation (Optional)
+== Exercise 6: Test Policy Violation (Optional)
 
 Demonstrate what happens when policy gates fail.
 
@@ -162,9 +241,9 @@ Demonstrate what happens when policy gates fail.
 sudo rm -f /var/log/last-backup-timestamp
 ----
 
-. In AAP Controller, launch just the "Pre-Patch Policy Check" job template.
+. In AAP Controller, launch just the "Pre-Patch Check" job template.
 
-. Observe the failure: the assertion will report a policy violation because no backup exists within the required window.
+. Observe the failure: OPA returns `allow_patch: false` and your playbook reports which gate was violated.
 
 . Restore the marker for subsequent exercises:
 +
@@ -183,16 +262,16 @@ You've successfully completed the CONTAIN module.
 
 **What you accomplished:**
 
-* Examined policy-as-code definitions for change management
-* Built a multi-node AAP workflow with approval gates
+* Wrote an Ansible playbook that queries OPA for policy-as-code decisions
+* Built a multi-node AAP workflow with an approval gate
 * Executed policy-gated patching end-to-end
 * Generated compliance evidence automatically
 * Demonstrated policy violation detection
 
 **Key takeaways:**
 
+* OPA evaluates policy gates — Ansible gathers facts and enforces the decision
 * Approval nodes provide human-in-the-loop without slowing automation
-* Policy gates are Ansible assertions — simple, auditable, version-controlled
 * `set_stats` provides a machine-readable audit trail across workflow nodes
 * Compliance reporting as a workflow step eliminates manual evidence gathering
 

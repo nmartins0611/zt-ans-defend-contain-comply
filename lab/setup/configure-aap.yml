@@ -284,13 +284,16 @@
           - contain
         state: present
 
-    # ── Workflow: Policy-Gated Patching ────────────────────────────────
+    # ── Workflow: Policy-Gated Patching (attendees build this in the UI) ─
     - name: Create workflow -- Policy-Gated Patching
       ansible.controller.workflow_job_template:
         name: "Policy-Gated Patching"
         organization: "{{ workshop_org }}"
         inventory: "{{ workshop_inventory_name }}"
         state: present
+      tags:
+        - patching_workflow
+        - never
 
     - name: Build Policy-Gated Patching workflow nodes
       ansible.controller.workflow_job_template_node:
@@ -304,6 +307,9 @@
         - { id: patch, template: "Patch System" }
         - { id: verify, template: "Post-Patch Verify" }
         - { id: report, template: "Report Compliance" }
+      tags:
+        - patching_workflow
+        - never
 
     - name: Create approval node for patching workflow
       ansible.controller.workflow_job_template_node:
@@ -315,6 +321,9 @@
           timeout: 900
         organization: "{{ workshop_org }}"
         state: present
+      tags:
+        - patching_workflow
+        - never
 
     - name: Link patching workflow -- precheck to approval
       ansible.controller.workflow_job_template_node:
@@ -324,6 +333,9 @@
         success_nodes:
           - precheck
         state: present
+      tags:
+        - patching_workflow
+        - never
 
     - name: Link patching workflow -- approval to patch
       ansible.controller.workflow_job_template_node:
@@ -333,6 +345,9 @@
         success_nodes:
           - approval
         state: present
+      tags:
+        - patching_workflow
+        - never
 
     - name: Link patching workflow -- patch to verify
       ansible.controller.workflow_job_template_node:
@@ -342,6 +357,9 @@
         success_nodes:
           - patch
         state: present
+      tags:
+        - patching_workflow
+        - never
 
     - name: Link patching workflow -- verify to report
       ansible.controller.workflow_job_template_node:
@@ -351,6 +369,9 @@
         success_nodes:
           - verify
         state: present
+      tags:
+        - patching_workflow
+        - never
 
     # ── Workflow: Compliance and Hardening ──────────────────────────────
     - name: Create workflow -- Compliance and Hardening
