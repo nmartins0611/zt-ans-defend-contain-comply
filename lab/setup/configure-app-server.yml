@@ -116,10 +116,22 @@
         group: apache
         mode: "0644"
 
+    - name: Reset httpd failed state if needed
+      ansible.builtin.command:
+        cmd: systemctl reset-failed httpd
+      changed_when: false
+      failed_when: false
+
+    - name: Validate httpd configuration
+      ansible.builtin.command:
+        cmd: httpd -t
+      register: _httpd_configtest
+      changed_when: false
+
     - name: Enable and start httpd
       ansible.builtin.systemd:
         name: httpd
-        state: started
+        state: restarted
         enabled: true
 
     # ── Errata repo configuration ──────────────────────────────────────
