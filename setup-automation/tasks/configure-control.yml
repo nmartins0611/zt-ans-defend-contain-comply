@@ -80,3 +80,6 @@
     ANSIBLE_HOST_KEY_CHECKING: "False"
   register: _eda_config
   changed_when: true
+  tags:
+    - eda
+    - never
