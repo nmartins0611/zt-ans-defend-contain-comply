@@ -76,6 +76,14 @@
         path: /etc/httpd/conf.d/ssl.conf
         state: absent
 
+    - name: Remove mod_http2 configs incompatible with downgraded httpd
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/httpd/conf.modules.d/10-h2.conf
+        - /etc/httpd/conf.modules.d/10-proxy_h2.conf
+
     - name: Deploy Meridian Financial landing page
       ansible.builtin.copy:
         content: |
