@@ -20,7 +20,12 @@
       failed_when: false
 
     # ── Firewalld ──────────────────────────────────────────────────────
-    - name: Ensure firewalld is installed and running
+    - name: Install firewalld
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld is running
       ansible.builtin.systemd:
         name: firewalld
         state: started
