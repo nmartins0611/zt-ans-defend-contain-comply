@@ -96,7 +96,7 @@
         body:
           name: "{{ workshop_project_name }}"
           url: "{{ gitea_url }}/{{ gitea_repo }}.git"
-          scm_branch: master
+          scm_branch: dev
         status_code: [201]
       register: _eda_project
       when: _existing_project.json.count == 0

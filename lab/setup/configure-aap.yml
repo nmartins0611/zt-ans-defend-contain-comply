@@ -39,7 +39,7 @@
         organization: "{{ workshop_org }}"
         scm_type: git
         scm_url: "{{ gitea_url }}/{{ gitea_repo }}.git"
-        scm_branch: master
+        scm_branch: dev
         scm_update_on_launch: false
         state: present
       register: _project
