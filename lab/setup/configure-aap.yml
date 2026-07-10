@@ -185,7 +185,7 @@
         inventory: "{{ workshop_inventory_name }}"
         credential: "{{ workshop_credential_name }}"
         execution_environment: "{{ workshop_ee_name }}"
-        ask_extra_vars_on_launch: true
+        ask_variables_on_launch: true
         state: present
 
     - name: Create job template -- CIS Harden
