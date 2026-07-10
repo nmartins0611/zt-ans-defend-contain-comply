@@ -1,0 +1,113 @@
+---
+- name: Configure DCC errata repository on central VM
+  hosts: central
+  gather_facts: false
+  become: true
+
+  vars_files:
+    - vars/workshop.yml
+
+  tasks:
+    - name: Install createrepo tools
+      ansible.builtin.dnf:
+        name:
+          - createrepo_c
+          - python3
+        state: present
+
+    - name: Create errata repo directory structure
+      ansible.builtin.file:
+        path: "{{ errata_repo_path }}/Packages"
+        state: directory
+        mode: "0755"
+
+    - name: Check if patched httpd RPMs are already downloaded
+      ansible.builtin.find:
+        paths: "{{ errata_repo_path }}/Packages"
+        patterns: "httpd-core-{{ patched_httpd_version }}*.rpm"
+      register: _existing_rpms
+
+    - name: Download patched httpd RPMs from CDN
+      ansible.builtin.command:
+        cmd: >-
+          dnf download
+          --destdir {{ errata_repo_path }}/Packages
+          --resolve
+          httpd-{{ patched_httpd_version }}
+          httpd-core-{{ patched_httpd_version }}
+          httpd-filesystem-{{ patched_httpd_version }}
+          httpd-tools-{{ patched_httpd_version }}
+          mod_ssl
+      when: _existing_rpms.matched == 0
+      register: _download_result
+      changed_when: _download_result.rc == 0
+
+    - name: Copy updateinfo.xml to repo directory
+      ansible.builtin.copy:
+        src: files/updateinfo.xml
+        dest: "{{ errata_repo_path }}/updateinfo.xml"
+        mode: "0644"
+
+    - name: Check if repodata already exists
+      ansible.builtin.stat:
+        path: "{{ errata_repo_path }}/repodata/repomd.xml"
+      register: _repodata
+
+    - name: Create yum repository metadata
+      ansible.builtin.command:
+        cmd: "createrepo {{ errata_repo_path }}"
+      when: not _repodata.stat.exists or _download_result is changed
+      register: _createrepo
+      changed_when: _createrepo.rc == 0
+
+    - name: Inject advisory metadata into repository
+      ansible.builtin.command:
+        cmd: "modifyrepo_c {{ errata_repo_path }}/updateinfo.xml {{ errata_repo_path }}/repodata/"
+      when: _createrepo is changed
+      register: _modifyrepo
+      changed_when: _modifyrepo.rc == 0
+
+    - name: Create systemd service for errata repo HTTP server
+      ansible.builtin.copy:
+        content: |
+          [Unit]
+          Description=DCC Workshop Errata Repository HTTP Server
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/python3 -m http.server {{ errata_repo_port }} --directory {{ errata_repo_path }}
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/{{ errata_repo_service_name }}.service
+        mode: "0644"
+      register: _service_unit
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: _service_unit is changed
+
+    - name: Start and enable errata repo HTTP server
+      ansible.builtin.systemd:
+        name: "{{ errata_repo_service_name }}"
+        state: started
+        enabled: true
+
+    - name: Verify errata repo is serving content
+      ansible.builtin.uri:
+        url: "http://localhost:{{ errata_repo_port }}/repodata/repomd.xml"
+        status_code: [200]
+      retries: 5
+      delay: 3
+      register: _repo_check
+      until: _repo_check is succeeded
+
+    - name: Report errata repo status
+      ansible.builtin.debug:
+        msg: >-
+          Errata repo ready at http://{{ inventory_hostname }}:{{ errata_repo_port }}/
+          serving {{ target_advisory }} for {{ target_cve }}

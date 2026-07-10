@@ -1,0 +1,71 @@
+---
+- name: Generate compliance evidence report
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    report_output_dir: /tmp/compliance-reports
+    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
+    organization: Meridian Financial
+
+  tasks:
+    - name: Ensure report output directory exists
+      ansible.builtin.file:
+        path: "{{ report_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Gather compliance evidence - installed packages
+      ansible.builtin.command:
+        cmd: rpm -q httpd
+      register: _current_httpd
+      changed_when: false
+
+    - name: Gather compliance evidence - applied advisories
+      ansible.builtin.command:
+        cmd: "yum history info"
+      register: _yum_history
+      changed_when: false
+
+    - name: Gather compliance evidence - SELinux status
+      ansible.builtin.command:
+        cmd: sestatus
+      register: _sestatus
+      changed_when: false
+
+    - name: Gather compliance evidence - firewall rules
+      ansible.builtin.command:
+        cmd: firewall-cmd --list-all
+      register: _firewall_rules
+      changed_when: false
+
+    - name: Gather compliance evidence - open ports
+      ansible.builtin.command:
+        cmd: ss -tlnp
+      register: _ports
+      changed_when: false
+
+    - name: Generate HTML compliance report
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/compliance-report.html.j2"
+        dest: "{{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html"
+        mode: "0644"
+      vars:
+        report_data:
+          host: "{{ inventory_hostname }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          cve: "{{ target_cve }}"
+          advisory: "{{ target_advisory }}"
+          organization: "{{ organization }}"
+          httpd_version: "{{ _current_httpd.stdout }}"
+          selinux_status: "{{ _sestatus.stdout }}"
+          firewall_config: "{{ _firewall_rules.stdout }}"
+          listening_ports: "{{ _ports.stdout }}"
+          yum_history: "{{ _yum_history.stdout }}"
+
+    - name: Report location of compliance evidence
+      ansible.builtin.debug:
+        msg: >-
+          Compliance report generated:
+          {{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html

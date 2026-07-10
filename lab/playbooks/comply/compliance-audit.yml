@@ -1,0 +1,122 @@
+---
+- name: Compliance audit via OPA policy evaluation
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    opa_url: "http://{{ opa_host | default('central') }}:{{ opa_port | default(8181) }}"
+    audit_phase: "{{ audit_phase | default('pre') }}"
+    report_output_dir: /tmp/compliance-reports
+    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+
+  tasks:
+    - name: Ensure report directory exists
+      ansible.builtin.file:
+        path: "{{ report_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Gather SELinux mode
+      ansible.builtin.command:
+        cmd: getenforce
+      register: _selinux
+      changed_when: false
+
+    - name: Gather firewall state
+      ansible.builtin.command:
+        cmd: firewall-cmd --state
+      register: _firewall
+      changed_when: false
+      failed_when: false
+
+    - name: Gather SSH configuration
+      ansible.builtin.command:
+        cmd: sshd -T
+      register: _sshd_config
+      changed_when: false
+      become: true
+
+    - name: Parse SSH settings
+      ansible.builtin.set_fact:
+        ssh_permit_root_login: "{{ _sshd_config.stdout_lines | select('match', '^permitrootlogin') | first | split() | last }}"
+        ssh_x11_forwarding: "{{ _sshd_config.stdout_lines | select('match', '^x11forwarding') | first | split() | last }}"
+        ssh_max_auth_tries: "{{ (_sshd_config.stdout_lines | select('match', '^maxauthtries') | first | split() | last) | int }}"
+        ssh_client_alive_interval: "{{ (_sshd_config.stdout_lines | select('match', '^clientaliveinterval') | first | split() | last) | int }}"
+
+    - name: Gather sysctl values
+      ansible.builtin.command:
+        cmd: "sysctl -n {{ item }}"
+      register: _sysctl_values
+      changed_when: false
+      loop:
+        - net.ipv4.conf.all.accept_redirects
+        - net.ipv4.conf.all.send_redirects
+        - kernel.randomize_va_space
+
+    - name: Gather file permissions
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: _file_perms
+      loop:
+        - /etc/passwd
+        - /etc/shadow
+
+    - name: Check for open CVEs
+      ansible.builtin.command:
+        cmd: yum updateinfo list cves --quiet
+      register: _cve_list
+      changed_when: false
+
+    - name: Check rpcbind service state
+      ansible.builtin.command:
+        cmd: systemctl is-enabled rpcbind
+      register: _rpcbind
+      changed_when: false
+      failed_when: false
+
+    - name: Build OPA input payload
+      ansible.builtin.set_fact:
+        opa_input:
+          selinux_mode: "{{ _selinux.stdout }}"
+          firewall_active: "{{ _firewall.rc == 0 }}"
+          ssh_permit_root_login: "{{ ssh_permit_root_login }}"
+          ssh_x11_forwarding: "{{ ssh_x11_forwarding }}"
+          ssh_max_auth_tries: "{{ ssh_max_auth_tries | int }}"
+          ssh_client_alive_interval: "{{ ssh_client_alive_interval | int }}"
+          sysctl_accept_redirects: "{{ _sysctl_values.results[0].stdout | int }}"
+          sysctl_send_redirects: "{{ _sysctl_values.results[1].stdout | int }}"
+          sysctl_randomize_va_space: "{{ _sysctl_values.results[2].stdout | int }}"
+          passwd_mode: "{{ _file_perms.results[0].stat.mode | int(base=8) % 4096 }}"
+          shadow_mode: "{{ _file_perms.results[1].stat.mode | int(base=8) % 4096 }}"
+          rpcbind_enabled: "{{ _rpcbind.stdout == 'enabled' }}"
+          open_cves: "{{ [target_cve] if target_cve in _cve_list.stdout else [] }}"
+
+    - name: Query OPA compliance policy
+      ansible.builtin.uri:
+        url: "{{ opa_url }}/v1/data/dcc/compliance/result"
+        method: POST
+        body_format: json
+        body:
+          input: "{{ opa_input }}"
+        return_content: true
+      register: _opa_response
+
+    - name: Save audit results
+      ansible.builtin.copy:
+        content: "{{ _opa_response.json.result | to_nice_json }}"
+        dest: "{{ report_output_dir }}/audit-results-{{ audit_phase }}.json"
+        mode: "0644"
+
+    - name: Display audit summary
+      ansible.builtin.debug:
+        msg: |
+          Compliance Audit ({{ audit_phase }}):
+            Compliant: {{ _opa_response.json.result.compliant }}
+            Controls:  {{ _opa_response.json.result.passed }}/{{ _opa_response.json.result.total }} passed
+
+    - name: Set audit stats for workflow
+      ansible.builtin.set_stats:
+        data:
+          "{{ audit_phase }}_audit_compliant": "{{ _opa_response.json.result.compliant }}"
+          "{{ audit_phase }}_audit_pass_count": "{{ _opa_response.json.result.passed }}"
+          "{{ audit_phase }}_audit_total_count": "{{ _opa_response.json.result.total }}"

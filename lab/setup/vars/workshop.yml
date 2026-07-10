@@ -1,0 +1,62 @@
+---
+# Defend, Contain, Comply -- Workshop Setup Variables
+# Referenced by all setup playbooks via vars_files.
+
+# CVE and advisory targeting
+target_cve: CVE-2024-38476
+target_advisory: RHSA-2024:5138
+vulnerable_httpd_version: "2.4.57-5.el9"
+patched_httpd_version: "2.4.62-1.el9"
+
+# Errata repo served from central VM
+errata_repo_path: /opt/dcc-errata-repo
+errata_repo_port: 8085
+errata_repo_service_name: dcc-errata-repo
+
+# Workshop scenario
+company_name: Meridian Financial
+app_port: 8443
+registry_port: 5000
+
+# AAP Controller
+aap_host: "https://{{ hostvars['control']['ansible_host'] | default('control') }}"
+aap_user: admin
+aap_password: "{{ aap_admin_password | default('ansible123!') }}"
+
+# EDA Controller
+eda_host: "https://{{ hostvars['control']['ansible_host'] | default('control') }}"
+eda_user: admin
+eda_password: "{{ eda_admin_password | default('ansible123!') }}"
+eda_webhook_port: 5000
+
+# Host references
+app_server_host: rhel01
+central_host: central
+control_host: control
+
+# AAP resource names
+workshop_org: Default
+workshop_project_name: "Defend, Contain, Comply"
+workshop_inventory_name: "DCC Workshop"
+workshop_credential_name: "DCC App Server"
+workshop_ee_name: "Default execution environment"
+
+# Gitea SCM
+gitea_url: "http://gitea:3000"
+gitea_repo: "gitea/defend-contain-comply"
+
+# Splunk container
+splunk_host: "{{ hostvars['central']['ansible_host'] | default('central') }}"
+splunk_port: 8089
+splunk_user: admin
+splunk_password: "{{ splunk_admin_password | default('ansible123!') }}"
+splunk_container_name: splunk
+splunk_image: docker.io/splunk/splunk:latest
+splunk_hec_token: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+splunk_data_dir: /opt/splunk-data
+
+# OPA container
+opa_container_name: opa
+opa_image: docker.io/openpolicyagent/opa:latest
+opa_policy_dir: /opt/opa/policies
+opa_port: 8181

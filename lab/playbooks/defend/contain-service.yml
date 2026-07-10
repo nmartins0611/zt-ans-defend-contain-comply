@@ -1,0 +1,101 @@
+---
+- name: Contain vulnerable service
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    target_service: "{{ target_service | default('httpd') }}"
+    allowed_sources:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+    containment_zone: internal-only
+
+  tasks:
+    - name: Restrict firewall access to internal networks only
+      ansible.posix.firewalld:
+        rich_rule: "rule family=ipv4 source address={{ item }} service name={{ target_service }} accept"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ containment_zone }}"
+      loop: "{{ allowed_sources }}"
+
+    - name: Remove public access to the service
+      ansible.posix.firewalld:
+        service: "{{ target_service }}"
+        permanent: true
+        immediate: true
+        state: disabled
+        zone: public
+
+    - name: Move service interface to containment zone
+      ansible.posix.firewalld:
+        zone: "{{ containment_zone }}"
+        interface: "{{ ansible_default_ipv4.interface }}"
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Harden service configuration - disable unnecessary modules
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^LoadModule {{ item }}"
+        line: "#LoadModule {{ item }}"
+        backrefs: true
+      loop:
+        - cgi_module
+        - autoindex_module
+        - status_module
+      notify: Restart target service
+
+    - name: Restrict server information exposure
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^ServerTokens"
+        line: "ServerTokens Prod"
+      notify: Restart target service
+
+    - name: Disable server signature
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^ServerSignature"
+        line: "ServerSignature Off"
+      notify: Restart target service
+
+    - name: Add security headers configuration
+      ansible.builtin.copy:
+        content: |
+          # Containment security headers - applied {{ ansible_date_time.iso8601 }}
+          Header always set X-Content-Type-Options "nosniff"
+          Header always set X-Frame-Options "DENY"
+          Header always set Content-Security-Policy "default-src 'self'"
+          Header always set Referrer-Policy "strict-origin-when-cross-origin"
+        dest: /etc/httpd/conf.d/security-containment.conf
+        mode: "0644"
+        owner: root
+        group: root
+      notify: Restart target service
+
+    - name: Log containment action
+      ansible.builtin.lineinfile:
+        path: /var/log/containment-actions.log
+        line: "{{ ansible_date_time.iso8601 }} | CONTAINED | {{ target_service }} | restricted to internal-only access"
+        create: true
+        mode: "0640"
+
+    - name: Notify Splunk of containment action
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/splunk-hec-event.yml"
+      vars:
+        splunk_event_data:
+          action: containment
+          host: "{{ inventory_hostname }}"
+          service: "{{ target_service }}"
+          zone: "{{ containment_zone }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          message: "Service {{ target_service }} contained to zone {{ containment_zone }}"
+
+  handlers:
+    - name: Restart target service
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+        state: restarted

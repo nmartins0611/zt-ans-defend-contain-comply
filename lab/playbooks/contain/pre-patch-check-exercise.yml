@@ -1,0 +1,92 @@
+---
+# EXERCISE: Write a pre-patch policy check that queries OPA.
+#
+# This playbook gathers system facts, sends them to OPA for policy
+# evaluation, and fails the play if any gates are not met.
+#
+# Steps:
+#   1. Gather facts: backup marker age, service state, free disk space
+#   2. POST the facts to OPA at {{ opa_url }}/v1/data/dcc/patch_policy/result
+#   3. Display the gate results
+#   4. Fail the play if allow_patch is false
+#   5. Record the result with set_stats for the workflow
+#
+# OPA INPUT PAYLOAD (what OPA expects):
+#   {
+#     "input": {
+#       "current_hour":    <int>,     -- from ansible_date_time.hour
+#       "backup_age_hours": <float>,  -- hours since /var/log/last-backup-timestamp was modified
+#       "free_disk_gb":    <float>,   -- free space on / in GB
+#       "service_state":   <string>   -- ActiveState of httpd (e.g. "active")
+#     }
+#   }
+#
+# OPA RESPONSE (what you get back):
+#   {
+#     "result": {
+#       "allow_patch": true|false,
+#       "gates": { "<gate_name>": { "pass": true|false, "description": "..." }, ... },
+#       "passed_gates": <int>,
+#       "total_gates":  <int>,
+#       "failed_gates": [ "<gate_name>", ... ]
+#     }
+#   }
+#
+# HINTS:
+#   - Use ansible.builtin.stat to get the backup marker mtime
+#   - Calculate age: (epoch_now - mtime) / 3600
+#   - ansible_mounts gives you mount info; filter for mount == "/"
+#   - Use ansible.builtin.uri to POST to OPA
+#   - Use ansible.builtin.fail with when: to block patching
+#   - Use ansible.builtin.set_stats to pass data to workflow nodes
+#
+# SOLUTION: lab/playbooks/contain/pre-patch-check.yml
+
+- name: Pre-patch policy check via OPA
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    opa_url: "http://{{ opa_host | default('central') }}:{{ opa_port | default(8181) }}"
+    target_service: "{{ target_service | default('httpd') }}"
+    backup_marker_path: /var/log/last-backup-timestamp
+
+  tasks:
+    # Step 1: Gather system facts for policy evaluation
+    - name: Check backup marker age
+      # TODO: Use ansible.builtin.stat on backup_marker_path
+      #       Register as _backup_marker
+
+    - name: Calculate backup age
+      # TODO: Set fact backup_age_hours
+      #       If marker exists: (epoch_now - mtime) / 3600
+      #       If marker missing: 999
+
+    - name: Check target service state
+      # TODO: Use ansible.builtin.systemd to query target_service
+      #       Register as _service_state
+
+    - name: Calculate free disk space
+      # TODO: Set fact free_disk_gb from ansible_mounts (mount == "/")
+      #       Convert bytes to GB (divide by 1073741824)
+
+    # Step 2: Query OPA
+    - name: Query OPA patch policy
+      # TODO: POST to {{ opa_url }}/v1/data/dcc/patch_policy/result
+      #       Body: { "input": { current_hour, backup_age_hours, free_disk_gb, service_state } }
+      #       Register as _opa_response
+
+    # Step 3: Display results
+    - name: Display policy gate results
+      ansible.builtin.debug:
+        msg: "TODO: Print gate results from _opa_response.json.result"
+
+    # Step 4: Enforce policy
+    - name: Fail if policy gates not met
+      # TODO: Use ansible.builtin.fail when allow_patch is false
+      #       Include failed gate names in the message
+
+    # Step 5: Record for workflow
+    - name: Record policy check pass
+      # TODO: Use ansible.builtin.set_stats to record:
+      #       pre_patch_policy_passed, policy_check_timestamp, policy_gates_passed

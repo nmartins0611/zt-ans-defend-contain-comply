@@ -2,26 +2,25 @@
 :toc: auto
 
 A hands-on workshop demonstrating automated vulnerability response, policy-gated
-patching, and container supply-chain compliance using Red Hat Ansible Automation
-Platform.
+patching, and compliance hardening using Red Hat Ansible Automation Platform.
 
 == Workshop Modules
 
-[cols="1,3"]
+[cols="1,2,2"]
 |===
-| Module | Focus
+| Module | Focus | Hands-on exercises
 
-| *DEFEND*
+| *DEFEND -- Detect and Contain*
 | Detect CVE-2024-38476 in Apache httpd, contain the vulnerable service, and harden the system posture -- all driven by Event-Driven Ansible responding to Splunk alerts.
+| Write an EDA rulebook from a skeleton; configure EDA Controller manually (credential, project, rulebook activation).
 
-| *CONTAIN*
-| Apply the RHSA-2024:5138 patch through a policy-gated workflow with pre-patch validation, approval gates, post-patch verification, and compliance reporting.
+| *CONTAIN -- Policy-Gated Remediation*
+| Apply the RHSA-2024:5138 patch through an OPA policy-gated workflow with pre-patch validation, approval gates, post-patch verification, and compliance reporting.
+| Write a pre-patch policy check playbook that queries OPA; build the Policy-Gated Patching workflow in the AAP UI.
 
-| *COMPLY*
-| Validate the system against OPA compliance policies, apply CIS-aligned hardening, and generate auditable evidence for the security team.
-
-| *SUPPLY CHAIN*
-| Build a hardened container image from the patched system, scan it for vulnerabilities, and push it to a local registry -- establishing a compliant supply chain.
+| *COMPLY -- Audit, Harden, Deliver*
+| Run a 13-control OPA compliance audit, apply CIS-aligned hardening, generate before/after evidence, then build a hardened container image, scan it, and push to a registry.
+| Execute and observe the full compliance and delivery workflow.
 |===
 
 == Architecture
@@ -39,15 +38,76 @@ Platform.
 
 == Repository Structure
 
-* `config/` -- VM topology, firewall rules, secrets
-* `content/` -- Antora lab guide (AsciiDoc)
-* `setup-automation/` -- Provisioning playbooks and bootstrap scripts
-* `runtime-automation/` -- Module transition scripts (progressive content reveal)
+[source]
+----
+zt-ans-defend-contain-comply/
+├── config/                        # VM topology, firewall rules, secrets
+├── content/                       # Showroom Antora pages (thin navigation)
+├── setup-automation/
+│   ├── main.yml                   # Pure Ansible orchestration (5 phases)
+│   ├── recover-after-restart.yml  # Post-reboot service recovery
+│   ├── ansible.cfg
+│   └── tasks/
+│       ├── common-bootstrap.yml   # SSH, SELinux, networking, RHSM
+│       ├── setup-central.yml      # Packages, collections, clone repo, deploy containers
+│       ├── setup-control.yml      # Repos, collections, clone repo, symlinks
+│       ├── configure-central.yml  # Run errata repo + Splunk alerts playbooks
+│       └── configure-control.yml  # Wait for AAP, OAuth token, run AAP/app config
+├── lab/                           # Workshop content (playbooks, setup, exercises)
+│   ├── playbooks/                 # Exercise playbooks (defend/, contain/, comply/)
+│   ├── setup/                     # AAP/EDA/app-server configure playbooks
+│   ├── inventory/                 # workshop.yml
+│   ├── templates/                 # Containerfile, compliance reports, Splunk payload
+│   ├── rulebooks/                 # EDA rulebooks (solution + exercise skeleton)
+│   ├── collections/               # requirements.yml
+│   ├── policies/                  # patch-policy.yml (OPA gate definitions)
+│   └── content/                   # Lab guide AsciiDoc (detailed exercises)
+├── ui-config.yml
+└── README.adoc
+----
 
-== Content Repository
+== Setup
 
-The workshop playbooks, roles, EDA rulebooks, and setup automation live in a
-separate content repository: https://github.com/nmartins-redhat/defend-contain-comply
+The automated setup provisions infrastructure and configures all services except EDA
+and the Policy-Gated Patching workflow, which are hands-on exercises.
+
+=== What the setup creates
+
+* Central services: Splunk, OPA, errata repository
+* App server: vulnerable httpd, firewalld, SELinux, Podman, container images
+* AAP: credential, project (Gitea sync), inventory, 13 job templates, 2 workflows
+  (Vulnerability Containment, Compliance and Hardening)
+
+=== What attendees configure manually
+
+* EDA Controller: credential, project, rulebook activation (Module 1)
+* Policy-Gated Patching workflow in AAP (Module 2)
+
+=== Opt-in automated setup
+
+To include EDA and the patching workflow in automated setup:
+
+[source,bash]
+----
+ansible-playbook setup-automation/main.yml --tags all,eda,patching_workflow
+----
+
+== Exercise Skeletons
+
+Two exercise files provide scaffolding with TODO comments, hints, and solution references:
+
+[cols="1,2,1"]
+|===
+| Exercise | Skeleton | Solution
+
+| EDA rulebook writing
+| `lab/rulebooks/splunk-cve-alert-exercise.yml`
+| `lab/rulebooks/splunk-cve-alert.yml`
+
+| Pre-patch OPA policy check
+| `lab/playbooks/contain/pre-patch-check-exercise.yml`
+| `lab/playbooks/contain/pre-patch-check.yml`
+|===
 
 == Prerequisites
 

@@ -1,0 +1,52 @@
+---
+- name: Emergency posture hardening (containment phase)
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    aide_db_path: /var/lib/aide/aide.db.gz
+
+  tasks:
+    - name: Enforce SELinux booleans for httpd containment
+      ansible.posix.seboolean:
+        name: "{{ item.name }}"
+        state: "{{ item.state }}"
+        persistent: true
+      loop:
+        - { name: httpd_can_network_connect, state: false }
+        - { name: httpd_can_sendmail, state: false }
+        - { name: httpd_enable_cgi, state: false }
+        - { name: httpd_use_nfs, state: false }
+
+    - name: Install AIDE for file integrity monitoring
+      ansible.builtin.dnf:
+        name: aide
+        state: present
+
+    - name: Initialize AIDE database if not present
+      ansible.builtin.command:
+        cmd: aide --init
+        creates: /var/lib/aide/aide.db.new.gz
+
+    - name: Activate AIDE database
+      ansible.builtin.copy:
+        src: /var/lib/aide/aide.db.new.gz
+        dest: "{{ aide_db_path }}"
+        remote_src: true
+        mode: "0600"
+      when: not (aide_db_path is file)
+
+    - name: Create AIDE check cron job
+      ansible.builtin.cron:
+        name: "AIDE integrity check"
+        minute: "0"
+        hour: "*/4"
+        job: "/usr/sbin/aide --check | /usr/bin/logger -t aide-check"
+        user: root
+
+    - name: Report hardening completion
+      ansible.builtin.debug:
+        msg: |
+          Emergency posture hardening complete on {{ inventory_hostname }}:
+            - SELinux booleans enforced (httpd network/cgi/nfs disabled)
+            - AIDE file integrity monitoring active

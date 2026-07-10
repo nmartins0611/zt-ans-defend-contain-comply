@@ -1,0 +1,94 @@
+---
+- name: Build hardened application container
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    container_name: meridian-app
+    container_tag: "{{ ansible_date_time.date }}"
+    containerfile_src: "{{ playbook_dir }}/../../templates/Containerfile.j2"
+    build_context: /tmp/container-build
+    registry_url: "localhost:5000"
+    app_port: 8443
+
+  tasks:
+    - name: Create build context directory
+      ansible.builtin.file:
+        path: "{{ build_context }}"
+        state: directory
+        mode: "0755"
+
+    - name: Generate Containerfile from template
+      ansible.builtin.template:
+        src: "{{ containerfile_src }}"
+        dest: "{{ build_context }}/Containerfile"
+        mode: "0644"
+      vars:
+        base_image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        service_port: "{{ app_port }}"
+
+    - name: Copy application content into build context
+      ansible.builtin.copy:
+        content: |
+          <html>
+          <head><title>Meridian Financial - Secure App</title></head>
+          <body>
+            <h1>Application Status: Healthy</h1>
+            <p>Hardened container built {{ ansible_date_time.iso8601 }}</p>
+            <p>Advisory {{ target_advisory | default('RHSA-2024:5138') }} applied.</p>
+          </body>
+          </html>
+        dest: "{{ build_context }}/index.html"
+        mode: "0644"
+
+    - name: Copy httpd configuration for container
+      ansible.builtin.copy:
+        content: |
+          ServerRoot "/etc/httpd"
+          Listen {{ app_port }}
+          ServerTokens Prod
+          ServerSignature Off
+          TraceEnable Off
+
+          LoadModule mpm_event_module modules/mod_mpm_event.so
+          LoadModule unixd_module modules/mod_unixd.so
+          LoadModule dir_module modules/mod_dir.so
+          LoadModule mime_module modules/mod_mime.so
+          LoadModule log_config_module modules/mod_log_config.so
+          LoadModule headers_module modules/mod_headers.so
+
+          TypesConfig /etc/mime.types
+          DocumentRoot "/var/www/html"
+          DirectoryIndex index.html
+
+          Header always set X-Content-Type-Options "nosniff"
+          Header always set X-Frame-Options "DENY"
+          Header always set Content-Security-Policy "default-src 'self'"
+
+          ErrorLog /dev/stderr
+          CustomLog /dev/stdout combined
+        dest: "{{ build_context }}/httpd.conf"
+        mode: "0644"
+
+    - name: Build container image with Podman
+      containers.podman.podman_image:
+        name: "{{ registry_url }}/{{ container_name }}"
+        tag: "{{ container_tag }}"
+        path: "{{ build_context }}"
+        build:
+          file: Containerfile
+          format: oci
+      register: _build_result
+
+    - name: Tag image as latest
+      containers.podman.podman_tag:
+        image: "{{ registry_url }}/{{ container_name }}:{{ container_tag }}"
+        target_names:
+          - "{{ registry_url }}/{{ container_name }}:latest"
+
+    - name: Report build result
+      ansible.builtin.debug:
+        msg: |
+          Container build complete:
+            Image: {{ registry_url }}/{{ container_name }}:{{ container_tag }}
+            ID: {{ _build_result.image.Id | default('built') }}

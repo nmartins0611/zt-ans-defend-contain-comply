@@ -1,0 +1,19 @@
+---
+# Reusable task: send an event to Splunk via HEC
+# Required variables: splunk_event_data (dict), splunk_hec_url, splunk_hec_token
+
+- name: Send event to Splunk HEC
+  ansible.builtin.uri:
+    url: "{{ splunk_hec_url | default('http://central:8088/services/collector/event') }}"
+    method: POST
+    headers:
+      Authorization: "Splunk {{ splunk_hec_token | default('a1b2c3d4-e5f6-7890-abcd-ef1234567890') }}"
+    body_format: json
+    body:
+      event: "{{ splunk_event_data }}"
+      sourcetype: "dcc:automation"
+      source: "aap-controller"
+      index: main
+    status_code: [200]
+    validate_certs: false
+  failed_when: false

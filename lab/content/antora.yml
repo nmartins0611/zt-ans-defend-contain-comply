@@ -1,0 +1,8 @@
+name: modules
+version: ~
+start_page: index.adoc
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    lab_name: "Defend, Contain, Comply"

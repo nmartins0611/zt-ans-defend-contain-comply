@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<updates>
+  <update type="security" from="errata@redhat.com" status="final" version="1">
+    <id>RHSA-2024:5138</id>
+    <title>Important: httpd security update</title>
+    <issued date="2024-08-08 00:00:00"/>
+    <updated date="2024-08-08 00:00:00"/>
+    <rights>Copyright 2024 Red Hat, Inc.</rights>
+    <release>Red Hat Enterprise Linux 9</release>
+    <severity>Important</severity>
+    <summary>An update for httpd is now available for Red Hat Enterprise Linux 9.</summary>
+    <description>
+The httpd packages provide the Apache HTTP Server, a powerful, efficient,
+and extensible web server.
+
+Security Fix(es):
+
+* httpd: Security issues via backend applications whose response headers
+  are malicious or exploitable (CVE-2024-38476)
+
+For more details about the security issue(s), including the impact, a CVSS
+score, acknowledgments, and other related information, refer to the CVE
+page(s) listed in the References section.
+    </description>
+    <references>
+      <reference href="https://access.redhat.com/errata/RHSA-2024:5138" id="RHSA-2024:5138" type="self" title="RHSA-2024:5138"/>
+      <reference href="https://access.redhat.com/security/cve/CVE-2024-38476" id="CVE-2024-38476" type="cve" title="CVE-2024-38476"/>
+    </references>
+    <pkglist>
+      <collection short="rhel-9-for-x86_64-appstream-rpms">
+        <name>Red Hat Enterprise Linux 9</name>
+        <package name="httpd" version="2.4.62" release="1.el9" epoch="0" arch="x86_64">
+          <filename>httpd-2.4.62-1.el9.x86_64.rpm</filename>
+        </package>
+        <package name="httpd-core" version="2.4.62" release="1.el9" epoch="0" arch="x86_64">
+          <filename>httpd-core-2.4.62-1.el9.x86_64.rpm</filename>
+        </package>
+        <package name="httpd-filesystem" version="2.4.62" release="1.el9" epoch="0" arch="noarch">
+          <filename>httpd-filesystem-2.4.62-1.el9.noarch.rpm</filename>
+        </package>
+        <package name="httpd-tools" version="2.4.62" release="1.el9" epoch="0" arch="x86_64">
+          <filename>httpd-tools-2.4.62-1.el9.x86_64.rpm</filename>
+        </package>
+        <package name="mod_ssl" version="2.4.62" release="1.el9" epoch="1" arch="x86_64">
+          <filename>mod_ssl-2.4.62-1.el9.x86_64.rpm</filename>
+        </package>
+      </collection>
+    </pkglist>
+  </update>
+</updates>
