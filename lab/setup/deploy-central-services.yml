@@ -17,6 +17,11 @@
         state: present
 
     # ── Firewall ───────────────────────────────────────────────────────
+    - name: Install firewalld
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
     - name: Ensure firewalld is running
       ansible.builtin.systemd:
         name: firewalld
