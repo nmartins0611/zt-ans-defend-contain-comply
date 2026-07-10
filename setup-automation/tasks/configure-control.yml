@@ -48,6 +48,7 @@
     cmd: >-
       ansible-playbook lab/setup/configure-app-server.yml
       -i lab/inventory/workshop.yml
+      -e "ansible_ssh_pass={{ hostvars[inventory_hostname].ansible_ssh_pass }}"
     chdir: "{{ workshop_repo_dest }}"
   environment:
     ANSIBLE_HOST_KEY_CHECKING: "False"
@@ -60,6 +61,7 @@
       ansible-playbook lab/setup/configure-aap.yml
       -i lab/inventory/workshop.yml
       -e "controller_oauth_token_override={{ controller_oauth_token }}"
+      -e "ansible_ssh_pass={{ hostvars[inventory_hostname].ansible_ssh_pass }}"
     chdir: "{{ workshop_repo_dest }}"
   environment:
     ANSIBLE_HOST_KEY_CHECKING: "False"
@@ -72,6 +74,7 @@
       ansible-playbook lab/setup/configure-eda.yml
       -i lab/inventory/workshop.yml
       -e "controller_oauth_token_override={{ controller_oauth_token }}"
+      -e "ansible_ssh_pass={{ hostvars[inventory_hostname].ansible_ssh_pass }}"
     chdir: "{{ workshop_repo_dest }}"
   environment:
     ANSIBLE_HOST_KEY_CHECKING: "False"
