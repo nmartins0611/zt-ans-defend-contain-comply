@@ -1,4 +1,4 @@
-= Module 2: CONTAIN -- Policy-Gated Patching
+= Module 2: CONTAIN -- Policy-Gated Remediation
 include::partial$_attributes.adoc[]
 
 == Objective
@@ -43,4 +43,4 @@ Approve the workflow when prompted.
 
 == Summary
 
-You have applied a security patch through a fully auditable, policy-gated workflow with approval controls. In the next module, you will containerize the hardened application.
+You have applied a security patch through a fully auditable, policy-gated workflow with approval controls. In the next module, you will validate compliance and apply CIS-aligned hardening.

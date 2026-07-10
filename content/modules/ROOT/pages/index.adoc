@@ -5,13 +5,13 @@ Welcome to the *Defend, Contain, Comply* workshop.
 
 You are a platform engineer at *{company_name}*. A Splunk alert fires: *{target_cve}* -- a critical Apache httpd SSRF vulnerability (CVSS 9.8) -- has been detected on your customer-facing application server.
 
-No patch exists yet. You must *defend* the system, *contain* the threat when a patch arrives, and *comply* by delivering a hardened container image.
+No patch exists yet. You must *defend* the system, *contain* the threat when a patch arrives, and *comply* by delivering auditable evidence and a hardened container image.
 
 == What You Will Learn
 
 * **Module 1 -- DEFEND**: Detect the CVE, contain the vulnerable service, and harden the system posture using Event-Driven Ansible responding to Splunk alerts.
-* **Module 2 -- CONTAIN**: Apply advisory *{target_advisory}* through a policy-gated workflow with approval nodes, pre-patch validation, and compliance reporting.
-* **Module 3 -- COMPLY**: Build a hardened container image from the patched system, scan it, and push it to a local registry.
+* **Module 2 -- CONTAIN**: Apply advisory *{target_advisory}* through an OPA policy-gated workflow with approval nodes, pre-patch validation, and compliance reporting.
+* **Module 3 -- COMPLY**: Validate the system against OPA compliance baselines, apply CIS-aligned hardening, generate evidence, build a hardened container, scan it, and push it to registry.
 
 == Lab Environment
 
@@ -22,7 +22,6 @@ No patch exists yet. You must *defend* the system, *contain* the threat when a p
 | `control` | AAP Controller + EDA Controller
 | `central` | Splunk (SIEM), OPA (policy engine), errata yum repo
 | `rhel01` | Target app server ({company_name} customer portal)
-| `vault` | HashiCorp Vault (credential management)
 | `gitea` | Git repository (containerized)
 |===
 

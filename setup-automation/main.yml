@@ -6,21 +6,6 @@
   vars_files:
     - ../config/secrets.yaml
   tasks:
-    - name: Add vault host
-      ansible.builtin.add_host:
-        name: vault
-        ansible_ssh_host: vault
-        ansible_ssh_port: "{{ lookup('ansible.builtin.env', 'BASTION_PORT') }}"
-        ansible_ssh_user: "{{ lookup('ansible.builtin.env', 'BASTION_USER') }}"
-        ansible_ssh_pass: "{{ lookup('ansible.builtin.env', 'BASTION_PASSWORD') }}"
-        ansible_become_password: "{{ lookup('ansible.builtin.env', 'BASTION_PASSWORD') }}"
-        ansible_python_interpreter: /usr/libexec/platform-python
-        net_interface: eth1
-        net_address: 192.168.1.12/24
-        net_dns: ""
-        net_dns_search: ""
-        selinux_mode: permissive
-
     - name: Add central host
       ansible.builtin.add_host:
         name: central
@@ -96,8 +81,6 @@
         names: control
       - ip: 192.168.1.11
         names: central
-      - ip: 192.168.1.12
-        names: vault
       - ip: 192.168.1.13
         names: rhel01
       - ip: 192.168.1.14
@@ -110,7 +93,6 @@
       ansible.builtin.include_tasks: tasks/common-bootstrap.yml
 
 # Phase 3: Host-specific bootstrap in parallel
-# vault: license + unseal
 # central: clone content repo, deploy Splunk + OPA containers
 # control: packages, collections install
 - name: Host-specific bootstrap
@@ -165,7 +147,6 @@
         REG_KEY: "{{ reg_username }}"
         REG_PASS: "{{ reg_password }}"
         SSH_KEY: "{{ ssh_key }}"
-        VAULT_LIC: "{{ vaultlic }}"
         AH_TOKEN: "{{ ahtoken }}"
         TMM_ID: "{{ tmm_activation }}"
         TMM_ORG: "{{ tmm_orgid }}"
@@ -192,7 +173,7 @@
         - r_result.rc != 0
 
 # Phase 4: Central configure
-# Waits for Vault, then runs DCC setup playbooks from content repo
+# Runs DCC setup playbooks from content repo
 - name: Central service-dependent configuration
   hosts: central
   gather_facts: false
@@ -204,15 +185,6 @@
     guid: "{{ lookup('ansible.builtin.env', 'GUID') }}"
     domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
   tasks:
-    - name: Wait for Vault to be unsealed
-      ansible.builtin.command: vault status -address=http://127.0.0.1:8200
-      delegate_to: vault
-      register: r_vault_ready
-      until: r_vault_ready.rc == 0
-      retries: 30
-      delay: 10
-      changed_when: false
-
     - name: Copy central configure script
       ansible.builtin.copy:
         src: ./setup-central-configure.sh
@@ -265,16 +237,6 @@
     guid: "{{ lookup('ansible.builtin.env', 'GUID') }}"
     domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
   tasks:
-    - name: Wait for Vault KV secret engine to be mounted
-      ansible.builtin.uri:
-        url: "http://192.168.1.12:8200/v1/sys/internal/ui/mounts/secret"
-        status_code: [200, 403, 404]
-      register: r_vault_kv_ready
-      until: r_vault_kv_ready.status in [200, 403]
-      retries: 12
-      delay: 10
-      become: false
-
     - name: Copy control configure script
       ansible.builtin.copy:
         src: ./setup-control-configure.sh

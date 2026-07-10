@@ -1,30 +1,61 @@
-= Module 3: COMPLY -- Container Supply Chain
+= Module 3: COMPLY -- Audit, Harden, Deliver
 include::partial$_attributes.adoc[]
 
 == Objective
 
-Build a hardened container image from the patched application server, scan it for vulnerabilities, and push it to a local registry -- establishing a compliant container supply chain.
+Validate the remediated system against OPA compliance baselines, apply CIS-aligned hardening, generate auditable evidence, then containerize the hardened application and push it to a trusted registry.
 
 == Scenario
 
-With {target_cve} patched and the system hardened, you need to deliver the application as an immutable container image. The image must be built from a trusted base (UBI9 minimal), include the patched `httpd`, run as a non-root user, and pass a vulnerability scan before being pushed to the registry.
+The patch is applied and the immediate threat is contained. Before declaring the incident resolved, Meridian Financial's security team requires proof that the system meets compliance baselines. Once compliance is confirmed, you will deliver the application as an immutable container image -- built from a trusted base, scanned for vulnerabilities, and pushed to a local registry.
 
 == Exercises
 
-=== Exercise 3.1: Build the Container Image
+=== Exercise 3.1: Review OPA Compliance Policies
 
-Run the *Build Container* job template. This uses Podman to build a container image from a templated Containerfile based on `ubi9/ubi-minimal` with the patched `httpd` installed.
+Examine the Rego policy bundles loaded on `central` that define Meridian Financial's security baselines.
 
-=== Exercise 3.2: Scan the Image
+The policies evaluate 13 controls across: SELinux, firewall, SSH hardening, kernel parameters, file permissions, services, and open CVEs.
 
-Run the *Scan Image* job template. This scans the built image for known vulnerabilities and verifies that {target_cve} is not present.
+=== Exercise 3.2: Pre-Hardening Compliance Audit
 
-=== Exercise 3.3: Push to Registry
+Run the *Compliance Audit* job template. This gathers system facts and evaluates them against OPA baselines.
 
-Run the *Push to Registry* job template. This pushes the verified image to the local Podman registry running on the app server.
+Review the structured JSON output showing which controls pass and which fail. Note the total -- this is your "before" baseline.
 
-Verify the image is accessible from the registry.
+=== Exercise 3.3: Apply CIS Hardening
+
+Run the *CIS Harden* job template. This applies CIS benchmark-aligned controls:
+
+* SSH hardening (disable root login, restrict auth tries, set timeouts)
+* File permission tightening on sensitive paths
+* Kernel parameter enforcement via sysctl
+* Service minimization (disable unnecessary daemons)
+* Login hardening (umask, core dumps, cron restriction)
+
+=== Exercise 3.4: Re-Audit and Generate Compliance Report
+
+Run the *Compliance Report* job template. This re-evaluates the system against OPA policies and generates an HTML report with:
+
+* All 13 controls with pass/fail status
+* Before/after comparison
+* System configuration evidence (SELinux, firewall, SSH, sysctl)
+* Remediation timeline
+
+=== Exercise 3.5: Build the Container Image
+
+Run the *Build Hardened Container* job template. This uses Podman to build a container image from `ubi9/ubi-minimal` with the patched `httpd`, running as a non-root user.
+
+=== Exercise 3.6: Scan and Push to Registry
+
+Run the *Scan Image* and *Push to Registry* job templates. The scan verifies {target_cve} is absent and no critical vulnerabilities exist. The push sends the verified image to the local registry.
+
+=== Exercise 3.7: Run the Full Compliance Workflow
+
+Run the *Compliance and Hardening* workflow template. This chains all steps: Audit (pre) -> CIS Harden -> Audit (post) -> Compliance Report -> Build -> Scan -> Push.
+
+Review the workflow artifacts in AAP Controller showing the complete audit and delivery trail.
 
 == Summary
 
-You have completed the full vulnerability lifecycle: from detection and containment, through policy-gated patching, to delivering a hardened container image. The application is now running from an immutable, scanned, and registered container.
+You have completed the full vulnerability lifecycle: detected the CVE, contained the service, applied a policy-gated patch, validated compliance, applied CIS hardening, generated evidence, and delivered a hardened container image. The entire process is automated, auditable, and repeatable.

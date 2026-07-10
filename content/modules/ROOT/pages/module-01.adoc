@@ -1,4 +1,4 @@
-= Module 1: DEFEND -- Vulnerability Response
+= Module 1: DEFEND -- Detect and Contain
 include::partial$_attributes.adoc[]
 
 == Objective

@@ -56,11 +56,8 @@ echo "  Token generated OK"
 export CONTROLLER_OAUTH_TOKEN
 
 ###############################################################################
-# 3. Run Vault and app server setup (from control, targeting remote hosts)
+# 3. Run app server setup (from control, targeting remote hosts)
 ###############################################################################
-
-ansible-playbook setup/configure-vault.yml \
-    -i inventory/workshop.yml
 
 ansible-playbook setup/configure-app-server.yml \
     -i inventory/workshop.yml

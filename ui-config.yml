@@ -7,13 +7,13 @@ antora:
       label: "Introduction"
       solveButton: false
     - name: module-01
-      label: "DEFEND: Vulnerability Response"
+      label: "DEFEND: Detect and Contain"
       solveButton: false
     - name: module-02
-      label: "CONTAIN: Policy-Gated Patching"
+      label: "CONTAIN: Policy-Gated Remediation"
       solveButton: false
     - name: module-03
-      label: "COMPLY: Container Supply Chain"
+      label: "COMPLY: Audit, Harden, Deliver"
       solveButton: false
     - name: conclusion
       label: "Conclusion"
@@ -34,9 +34,6 @@ tabs:
   - name: OPA
     url: https://opa-http-${guid}.${domain}
     external: false
-  - name: HashiCorp Vault
-    url: https://vault-${guid}.${domain}/ui/vault/unseal
-    external: true
   - name: Gitea
     url: https://gitea-${guid}.${domain}/
     external: false

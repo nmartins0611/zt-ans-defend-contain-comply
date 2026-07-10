@@ -2,7 +2,6 @@
 # DCC Workshop — Network Policy
 # Control: AAP Controller + EDA
 # Central: Splunk, OPA, Errata Repo
-# Vault:   HashiCorp Vault
 # rhel01:  App Server
 # rhel02:  Spare
 
@@ -27,11 +26,6 @@ ingress:
     port: 8089     # Splunk management API
   - protocol: TCP
     port: 9997     # Splunk forwarder receiver
-  # ── Vault ──
-  - protocol: TCP
-    port: 8200     # Vault API
-  - protocol: TCP
-    port: 8201     # Vault cluster
   # ── Gitea ──
   - protocol: TCP
     port: 3000     # Gitea web UI
@@ -68,11 +62,6 @@ egress:
     port: 8089     # Splunk management API
   - protocol: TCP
     port: 9997     # Splunk forwarder receiver
-  # ── Vault ──
-  - protocol: TCP
-    port: 8200     # Vault API
-  - protocol: TCP
-    port: 8201     # Vault cluster
   # ── Gitea ──
   - protocol: TCP
     port: 3000     # Gitea web UI

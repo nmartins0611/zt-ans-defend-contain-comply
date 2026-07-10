@@ -2,7 +2,7 @@
 # recover-after-restart.sh — Restore DCC lab runtime state after a stop/start.
 #
 # Checks and restarts services that may not survive a VM reboot despite
-# systemd enablement (Vault unseal, Podman containers, errata repo).
+# systemd enablement (Podman containers, errata repo).
 #
 # Usage:
 #   sudo bash recover-after-restart.sh
@@ -12,24 +12,7 @@ set -euo pipefail
 echo "DCC Workshop -- Recovery after restart"
 
 ###############################################################################
-# 1. Vault unseal (runs on vault host via SSH)
-###############################################################################
-
-echo "Checking Vault seal status..."
-if command -v vault &>/dev/null; then
-    if vault status -address=http://vault:8200 2>/dev/null | grep -q "Sealed.*true"; then
-        echo "  Vault is sealed -- attempting unseal..."
-        echo "  NOTE: Manual unseal keys required. Run:"
-        echo "    vault operator unseal -address=http://vault:8200"
-    else
-        echo "  Vault is unsealed or unreachable"
-    fi
-else
-    echo "  SKIP: vault CLI not available on this host"
-fi
-
-###############################################################################
-# 2. Splunk container
+# 1. Splunk container
 ###############################################################################
 
 echo "Checking Splunk container..."
@@ -45,7 +28,7 @@ else
 fi
 
 ###############################################################################
-# 3. OPA container
+# 2. OPA container
 ###############################################################################
 
 echo "Checking OPA container..."
@@ -61,7 +44,7 @@ else
 fi
 
 ###############################################################################
-# 4. Errata repo HTTP server
+# 3. Errata repo HTTP server
 ###############################################################################
 
 echo "Checking errata repo HTTP server..."
@@ -77,7 +60,7 @@ else
 fi
 
 ###############################################################################
-# 5. httpd on app server (rhel01)
+# 4. httpd on app server (rhel01)
 ###############################################################################
 
 echo "Checking httpd on app server..."

@@ -1,5 +1,5 @@
 * xref:index.adoc[Defend, Contain, Comply]
-* xref:module-01.adoc[Module 1: DEFEND -- Vulnerability Response]
-* xref:module-02.adoc[Module 2: CONTAIN -- Policy-Gated Patching]
-* xref:module-03.adoc[Module 3: COMPLY -- Container Supply Chain]
+* xref:module-01.adoc[Module 1: DEFEND -- Detect and Contain]
+* xref:module-02.adoc[Module 2: CONTAIN -- Policy-Gated Remediation]
+* xref:module-03.adoc[Module 3: COMPLY -- Audit, Harden, Deliver]
 * xref:conclusion.adoc[Conclusion]

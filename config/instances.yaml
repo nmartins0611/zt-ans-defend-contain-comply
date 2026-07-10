@@ -151,40 +151,6 @@ virtualmachines:
         tls: true
         tls_termination: Edge
 
-  - name: vault
-    image: vault-rhel-image-1
-    memory: 16G
-    cores: 4
-    image_size: 40Gi
-    tags:
-      - key: AnsibleGroup
-        value: isolated
-    networks:
-      - default
-      - secondary
-    services:
-      - name: vault-8200
-        ports:
-          - port: 8200
-            protocol: TCP
-            targetPort: 8200
-            name: vault-8200
-    routes:
-      - name: vault-8200
-        host: vault
-        service: vault-8200
-        targetPort: 8200
-        tls: true
-        tls_termination: Edge
-    userdata: |-
-      #cloud-config
-      user: rhel
-      password: ansible123!
-      chpasswd: { expire: False }
-      runcmd:
-        - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/50-cloud-init.conf
-        - systemctl reload sshd
-        
   - name: "rhel01"
     image: "rhel-9.5"
     memory: "16G"

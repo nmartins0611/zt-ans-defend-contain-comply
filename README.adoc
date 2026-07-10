@@ -18,6 +18,9 @@ Platform.
 | Apply the RHSA-2024:5138 patch through a policy-gated workflow with pre-patch validation, approval gates, post-patch verification, and compliance reporting.
 
 | *COMPLY*
+| Validate the system against OPA compliance policies, apply CIS-aligned hardening, and generate auditable evidence for the security team.
+
+| *SUPPLY CHAIN*
 | Build a hardened container image from the patched system, scan it for vulnerabilities, and push it to a local registry -- establishing a compliant supply chain.
 |===
 
@@ -31,7 +34,6 @@ Platform.
 | `central`  | Splunk (SIEM), OPA (policy engine), errata yum repo
 | `rhel01`   | Target app server (Meridian Financial customer portal)
 | `rhel02`   | Spare RHEL host
-| `vault`    | HashiCorp Vault (credential management)
 | `gitea`    | Git repository (containerized)
 |===
 
@@ -52,7 +54,6 @@ separate content repository: https://github.com/nmartins-redhat/defend-contain-c
 * OpenShift Virtualization cluster with RHDP provisioner
 * AAP 2.6 controller image
 * RHEL 9.5 base image
-* Vault image with license
 
 == License
 
