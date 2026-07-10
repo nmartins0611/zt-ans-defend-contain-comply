@@ -71,6 +71,11 @@
         name: mod_ssl
         state: present
 
+    - name: Remove default ssl.conf to avoid missing certificate errors
+      ansible.builtin.file:
+        path: /etc/httpd/conf.d/ssl.conf
+        state: absent
+
     - name: Deploy Meridian Financial landing page
       ansible.builtin.copy:
         content: |
