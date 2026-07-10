@@ -1,0 +1,84 @@
+---
+- name: Post-patch compliance verification
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    target_service: "{{ target_service | default('httpd') }}"
+    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    compliance_output_dir: /tmp/compliance-reports
+
+  tasks:
+    - name: Ensure compliance output directory exists
+      ansible.builtin.file:
+        path: "{{ compliance_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Verify target CVE is no longer in advisory list
+      ansible.builtin.command:
+        cmd: yum updateinfo list cves --quiet
+      register: _post_patch_cves
+      changed_when: false
+
+    - name: Assert CVE has been resolved
+      ansible.builtin.assert:
+        that:
+          - target_cve not in _post_patch_cves.stdout
+        fail_msg: >-
+          COMPLIANCE FAILURE: {{ target_cve }} still appears in security advisories
+          after patching. Manual investigation required.
+        success_msg: "{{ target_cve }} resolved - no longer in pending advisories."
+
+    - name: Verify service is running and enabled
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+      register: _service_post
+
+    - name: Assert service health
+      ansible.builtin.assert:
+        that:
+          - _service_post.status.ActiveState == "active"
+          - _service_post.status.UnitFileState == "enabled"
+        fail_msg: "Service {{ target_service }} is not healthy after patching."
+        success_msg: "Service {{ target_service }} is active and enabled."
+
+    - name: Check listening ports
+      ansible.builtin.command:
+        cmd: ss -tlnp
+      register: _listening_ports
+      changed_when: false
+
+    - name: Verify expected ports are listening
+      ansible.builtin.assert:
+        that:
+          - "'443' in _listening_ports.stdout or '80' in _listening_ports.stdout"
+        fail_msg: "Expected service ports not listening after patch."
+        success_msg: "Service ports confirmed listening."
+
+    - name: Run SELinux compliance check
+      ansible.builtin.command:
+        cmd: getenforce
+      register: _selinux_status
+      changed_when: false
+
+    - name: Assert SELinux is enforcing
+      ansible.builtin.assert:
+        that:
+          - _selinux_status.stdout == "Enforcing"
+        fail_msg: "COMPLIANCE FAILURE: SELinux is not in Enforcing mode."
+        success_msg: "SELinux is Enforcing."
+
+    - name: Check for containment artifacts still in place
+      ansible.builtin.stat:
+        path: "/etc/{{ target_service }}/conf.d/security-containment.conf"
+      register: _containment_conf
+
+    - name: Record verification results
+      ansible.builtin.set_stats:
+        data:
+          post_patch_verified: true
+          cve_resolved: "{{ target_cve not in _post_patch_cves.stdout }}"
+          service_healthy: "{{ _service_post.status.ActiveState == 'active' }}"
+          selinux_enforcing: "{{ _selinux_status.stdout == 'Enforcing' }}"
+          containment_headers_present: "{{ _containment_conf.stat.exists }}"

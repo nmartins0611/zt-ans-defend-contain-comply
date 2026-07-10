@@ -1,0 +1,189 @@
+include::partial$_attributes.adoc[]
+
+= Module 1: DEFEND — Detect and Contain
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+A critical Splunk alert has fired. CVE-2024-38476 — a CVSS 9.8 SSRF vulnerability in Apache HTTP Server — affects your production app server. There is **no patch available yet**. You must contain the threat using Ansible Automation Platform.
+
+In this module you will experience how Event-Driven Ansible receives a security alert and automatically triggers a containment workflow — reducing mean-time-to-contain from hours to seconds.
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Examine an EDA rulebook that processes Splunk webhook alerts
+* Trigger a simulated security alert and observe automated response
+* Understand how AAP workflows chain containment actions
+* Validate that a vulnerable service is hardened without being taken offline
+
+== Exercise 1: Explore the EDA Rulebook
+
+Before triggering the alert, examine how Event-Driven Ansible is configured to respond.
+
+. Open the EDA Controller UI and navigate to **Rulebook Activations**:
++
+Observe the `splunk-cve-alert` rulebook activation is running and listening on port 5000.
+
+. From the terminal, examine the rulebook source:
++
+[source,role="execute"]
+----
+cat /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/splunk-cve-alert.yml
+----
+
+. Note the key elements:
+* **Source**: `ansible.eda.webhook` listening on port 5000
+* **Condition**: Matches on `severity == "critical"` and checks for `cve_id`
+* **Action**: `run_workflow_template` triggers "Vulnerability Containment" in AAP Controller
+
+=== Verify
+
+The rulebook should show three rules:
+
+* Critical CVE → triggers containment workflow
+* High CVE → triggers scan only
+* Patch available → triggers patching workflow
+
+== Exercise 2: Trigger the Simulated Splunk Alert
+
+Now simulate what happens when Splunk detects the CVE on your app server.
+
+. Examine the sample Splunk alert payload:
++
+[source,role="execute"]
+----
+cat /var/lib/awx/projects/defend-contain-comply/lab/templates/splunk-alert-payload.json | python3 -m json.tool
+----
++
+Note: This mirrors a real Splunk Enterprise Security correlation alert — CVE-2024-38476, severity critical, no patch available.
+
+. Send the webhook to EDA Controller:
++
+[source,role="execute"]
+----
+curl -X POST http://eda-controller:5000/endpoint \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${EDA_WEBHOOK_TOKEN}" \
+  -d @/var/lib/awx/projects/defend-contain-comply/lab/templates/splunk-alert-payload.json
+----
+
+. Switch to the **AAP Controller UI** and navigate to **Jobs**:
++
+You should see the "Vulnerability Containment" workflow launching automatically.
+
+=== Verify
+
+* EDA Controller shows a new event received in the rulebook activation history
+* AAP Controller shows the workflow job in "Running" or "Successful" state
+
+== Exercise 3: Review the Containment Actions
+
+The workflow triggered three job templates in sequence. Examine what each did.
+
+. In AAP Controller, click the completed workflow job and review each node:
++
+* **Scan System** — confirmed CVE-2024-38476 is present
+* **Contain Service** — restricted network access and hardened httpd
+* **Harden Posture** — applied SELinux, sysctl, and file integrity controls
+
+. From the terminal, verify the firewall containment:
++
+[source,role="execute"]
+----
+sudo firewall-cmd --zone=internal-only --list-all
+----
++
+You should see rich rules allowing only internal network ranges (10.0.0.0/8, 172.16.0.0/12).
+
+. Check that public access has been removed:
++
+[source,role="execute"]
+----
+sudo firewall-cmd --zone=public --list-services
+----
++
+The `http` and `https` services should no longer appear in the public zone.
+
+. Verify SELinux booleans are enforced:
++
+[source,role="execute"]
+----
+getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail
+----
++
+All should show `off`.
+
+. Confirm the security headers are deployed:
++
+[source,role="execute"]
+----
+cat /etc/httpd/conf.d/security-containment.conf
+----
+
+. Verify the service is still running (contained, not killed):
++
+[source,role="execute"]
+----
+sudo systemctl status httpd --no-pager
+----
+
+=== Verify
+
+* Firewall restricts access to internal networks only
+* SELinux booleans prevent outbound connections and CGI
+* Security headers are in place
+* httpd is still active (service not disrupted — just contained)
+
+== Exercise 4: Validate File Integrity Monitoring
+
+The hardening playbook also deployed AIDE (Advanced Intrusion Detection Environment).
+
+. Check AIDE is installed and database initialized:
++
+[source,role="execute"]
+----
+rpm -q aide && ls -la /var/lib/aide/aide.db.gz
+----
+
+. Run an integrity check:
++
+[source,role="execute"]
+----
+sudo aide --check 2>&1 | head -20
+----
+
+. Verify the cron job is scheduled:
++
+[source,role="execute"]
+----
+sudo crontab -l | grep aide
+----
+
+=== Verify
+
+AIDE is active and will detect any unauthorized file modifications going forward.
+
+== Module summary
+
+You've successfully completed the DEFEND module.
+
+**What you accomplished:**
+
+* Examined an EDA rulebook processing Splunk webhook alerts
+* Triggered a simulated critical CVE alert
+* Observed automated containment workflow execution in AAP Controller
+* Validated firewall, SELinux, header, and integrity controls
+
+**Key takeaways:**
+
+* EDA eliminates the gap between detection and response
+* Containment != taking the service offline — it's about reducing attack surface
+* Workflows chain multiple job templates into a coordinated response
+* Every action is logged and auditable in AAP Controller
+
+**Next steps:**
+Module 2 will address what happens when Red Hat publishes an errata — you'll build a policy-gated patching workflow.

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Compliance Report - {{ report_data.organization }}</title>
+    <style>
+        body { font-family: 'Red Hat Display', 'Segoe UI', sans-serif; margin: 2rem; color: #1a1a1a; }
+        h1 { color: #ee0000; border-bottom: 2px solid #ee0000; padding-bottom: 0.5rem; }
+        h2 { color: #4a4a4a; margin-top: 2rem; }
+        .meta { background: #f5f5f5; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+        .meta dt { font-weight: bold; display: inline; }
+        .meta dd { display: inline; margin-left: 0.5rem; margin-right: 2rem; }
+        .pass { color: #2e7d32; font-weight: bold; }
+        .fail { color: #c62828; font-weight: bold; }
+        .fixed { color: #1565c0; font-weight: bold; }
+        pre { background: #263238; color: #eeffff; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+        th { background: #4a4a4a; color: white; }
+        tr.pass-row { background: #e8f5e9; }
+        tr.fail-row { background: #ffebee; }
+        tr.fixed-row { background: #e3f2fd; }
+        .summary-box { display: inline-block; padding: 1rem 2rem; margin: 0.5rem; border-radius: 4px; text-align: center; }
+        .summary-pass { background: #2e7d32; color: white; }
+        .summary-fail { background: #c62828; color: white; }
+        .summary-fixed { background: #1565c0; color: white; }
+        .footer { margin-top: 3rem; font-size: 0.9rem; color: #666; border-top: 1px solid #ddd; padding-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Compliance Evidence Report</h1>
+
+    <div class="meta">
+        <dl>
+            <dt>Organization:</dt><dd>{{ report_data.organization }}</dd>
+            <dt>Host:</dt><dd>{{ report_data.host }}</dd>
+            <dt>Generated:</dt><dd>{{ report_data.timestamp }}</dd>
+            <dt>CVE:</dt><dd>{{ report_data.cve }}</dd>
+            <dt>Advisory:</dt><dd>{{ report_data.advisory }}</dd>
+        </dl>
+    </div>
+
+    <h2>Overall Compliance</h2>
+{% if report_data.post_audit and report_data.post_audit.compliant is defined %}
+    <div class="summary-box {% if report_data.post_audit.compliant %}summary-pass{% else %}summary-fail{% endif %}">
+        <strong>{{ "COMPLIANT" if report_data.post_audit.compliant else "NON-COMPLIANT" }}</strong><br>
+        {{ report_data.post_audit.passed }}/{{ report_data.post_audit.total }} controls passed
+    </div>
+{% endif %}
+
+{% if report_data.pre_audit and report_data.pre_audit.controls is defined %}
+    <h2>Control Evaluation — Before / After</h2>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Control</th>
+            <th>Category</th>
+            <th>Pre-Hardening</th>
+            <th>Post-Hardening</th>
+            <th>Status</th>
+        </tr>
+{% for control in report_data.pre_audit.controls %}
+{% set post_control = report_data.post_audit.controls[loop.index0] if report_data.post_audit.controls is defined else {} %}
+{% set pre_pass = control.pass | default(false) %}
+{% set post_pass = post_control.pass | default(false) %}
+{% if not pre_pass and post_pass %}
+{% set row_class = "fixed-row" %}
+{% set status = "FIXED" %}
+{% set status_class = "fixed" %}
+{% elif post_pass %}
+{% set row_class = "pass-row" %}
+{% set status = "PASS" %}
+{% set status_class = "pass" %}
+{% else %}
+{% set row_class = "fail-row" %}
+{% set status = "FAIL" %}
+{% set status_class = "fail" %}
+{% endif %}
+        <tr class="{{ row_class }}">
+            <td>{{ control.id }}</td>
+            <td>{{ control.name }}</td>
+            <td>{{ control.category }}</td>
+            <td><span class="{% if pre_pass %}pass{% else %}fail{% endif %}">{{ "PASS" if pre_pass else "FAIL" }}</span></td>
+            <td><span class="{% if post_pass %}pass{% else %}fail{% endif %}">{{ "PASS" if post_pass else "FAIL" }}</span></td>
+            <td><span class="{{ status_class }}">{{ status }}</span></td>
+        </tr>
+{% endfor %}
+    </table>
+{% endif %}
+
+    <h2>Vulnerability Status</h2>
+    <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>CVE</td><td>{{ report_data.cve }}</td></tr>
+        <tr><td>Advisory Applied</td><td>{{ report_data.advisory }}</td></tr>
+        <tr><td>Current Package</td><td>{{ report_data.httpd_version }}</td></tr>
+        <tr><td>Status</td><td><span class="pass">REMEDIATED</span></td></tr>
+    </table>
+
+    <h2>SELinux Status</h2>
+    <pre>{{ report_data.selinux_status }}</pre>
+
+    <h2>SSH Configuration (hardened)</h2>
+    <pre>{{ report_data.ssh_config }}</pre>
+
+    <h2>Firewall Configuration</h2>
+    <pre>{{ report_data.firewall_config }}</pre>
+
+    <h2>Listening Services</h2>
+    <pre>{{ report_data.listening_ports }}</pre>
+
+    <div class="footer">
+        <p>This report was automatically generated by the AAP Compliance and Hardening Workflow.</p>
+        <p>Compliance baselines: CIS RHEL 9 Benchmark, OPA policy bundle dcc.compliance</p>
+    </div>
+</body>
+</html>

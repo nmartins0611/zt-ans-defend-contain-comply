@@ -1,0 +1,35 @@
+---
+all:
+  children:
+    appservers:
+      hosts:
+        app-server:
+          ansible_host: "{{ app_server_ip | default('rhel01') }}"
+          ansible_user: rhel
+      vars:
+        ansible_become: true
+        target_service: httpd
+        target_cve: CVE-2024-38476
+        target_advisory: RHSA-2024:5138
+
+    infrastructure:
+      hosts:
+        central:
+          ansible_host: "{{ central_ip | default('central') }}"
+          ansible_user: rhel
+        control:
+          ansible_host: "{{ controller_ip | default('control') }}"
+          ansible_user: rhel
+
+    controllers:
+      hosts:
+        aap-controller:
+          ansible_host: "{{ controller_ip | default('control') }}"
+        eda-controller:
+          ansible_host: "{{ eda_ip | default('control') }}"
+
+    registry:
+      hosts:
+        container-registry:
+          ansible_host: "{{ registry_ip | default(app_server_ip | default('rhel01')) }}"
+          registry_port: 5000

@@ -1,0 +1,200 @@
+include::partial$_attributes.adoc[]
+
+= Module 2: CONTAIN — Patch and Enforce
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+Red Hat has published **RHSA-2024:5138** — a security advisory addressing CVE-2024-38476 in Apache HTTP Server. A patched `httpd` package is now available in your repositories.
+
+However, Meridian Financial's change management policy requires that patches pass several gates before application: backup verification, maintenance window check, approval, and post-patch compliance validation.
+
+In this module you will build and execute a policy-gated patching workflow in AAP Controller.
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Construct a multi-node AAP workflow with approval gates
+* Implement policy-as-code checks as pre-patch prerequisites
+* Execute a patching workflow with rollback awareness
+* Generate compliance evidence as a workflow artifact
+
+== Exercise 1: Examine the Patch Policy
+
+Before building the workflow, understand the policies that govern patching at Meridian Financial.
+
+. From the terminal, review the patch policy definition:
++
+[source,role="execute"]
+----
+cat /var/lib/awx/projects/defend-contain-comply/lab/policies/patch-policy.yml
+----
++
+Note the five gates: maintenance window, backup verification, disk space, service health, and change approval.
+
+. Verify the current backup state (simulated — create the marker):
++
+[source,role="execute"]
+----
+sudo touch /var/log/last-backup-timestamp
+----
++
+This simulates a successful backup completing within the policy window.
+
+. Check available disk space:
++
+[source,role="execute"]
+----
+df -h /
+----
+
+=== Verify
+
+The patch policy defines clear, automatable prerequisites. The backup marker exists and disk space exceeds the 2GB minimum.
+
+== Exercise 2: Build the Patching Workflow in AAP Controller
+
+Now construct the workflow that enforces these policies.
+
+. In AAP Controller, navigate to **Resources → Workflow Templates** and open the pre-configured "Policy-Gated Patching" workflow.
+
+. Examine the workflow topology. It should contain these nodes in order:
++
+* **Pre-Patch Policy Check** (job template) — runs `pre-patch-check.yml`
+* **Approval: Change Advisory Board** (approval node) — requires manual approval
+* **Apply Security Patch** (job template) — runs `patch-system.yml`
+* **Post-Patch Verification** (job template) — runs `post-patch-verify.yml`
+* **Generate Compliance Report** (job template) — runs `report-compliance.yml`
+
+. Note the convergence links:
+* Pre-Patch Policy Check → **on success** → Approval node
+* Pre-Patch Policy Check → **on failure** → notification (policy violation)
+* Approval → **on approve** → Apply Security Patch
+* Apply Security Patch → **on success** → Post-Patch Verification
+* Post-Patch Verification → **on success** → Generate Compliance Report
+
+. Launch the workflow by clicking **Launch**.
+
+=== Verify
+
+The workflow should pause at the Approval node waiting for your authorization.
+
+== Exercise 3: Approve and Patch
+
+. In the running workflow job, click the **Approval** node and select **Approve**.
++
+This simulates the Change Advisory Board sign-off.
+
+. Watch the workflow proceed through the remaining nodes:
+* Apply Security Patch — installs `httpd-2.4.62-1.el9`
+* Post-Patch Verification — confirms CVE is resolved
+* Generate Compliance Report — produces HTML artifact
+
+. Once complete, examine the patch application from the terminal:
++
+[source,role="execute"]
+----
+rpm -q httpd
+----
++
+Expected: `httpd-2.4.62-1.el9` (or newer).
+
+. Confirm the CVE is no longer pending:
++
+[source,role="execute"]
+----
+yum updateinfo list cves 2>/dev/null | grep CVE-2024-38476 || echo "CVE-2024-38476: RESOLVED"
+----
+
+=== Verify
+
+* `httpd` is upgraded to the patched version
+* CVE-2024-38476 no longer appears in pending advisories
+* Workflow completed all nodes successfully
+
+== Exercise 4: Review the Compliance Report
+
+The final workflow node generated an HTML compliance report.
+
+. From the terminal, check the report was generated:
++
+[source,role="execute"]
+----
+ls -la /tmp/compliance-reports/
+----
+
+. View the report content:
++
+[source,role="execute"]
+----
+cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -A2 "Advisory Applied"
+----
+
+. In AAP Controller, check the workflow job → **Extra Vars / Artifacts** panel:
++
+The `set_stats` data from each job shows the complete audit trail:
+* `pre_patch_policy_passed: true`
+* `patch_applied: true`
+* `cve_resolved: true`
+* `selinux_enforcing: true`
+
+=== Verify
+
+The compliance report contains:
+
+* CVE identifier and advisory number
+* Package version before and after
+* SELinux status
+* Firewall configuration
+* Complete remediation timestamp
+
+== Exercise 5: Test Policy Violation (Optional)
+
+Demonstrate what happens when policy gates fail.
+
+. Remove the backup marker to simulate a stale backup:
++
+[source,role="execute"]
+----
+sudo rm -f /var/log/last-backup-timestamp
+----
+
+. In AAP Controller, launch just the "Pre-Patch Policy Check" job template.
+
+. Observe the failure: the assertion will report a policy violation because no backup exists within the required window.
+
+. Restore the marker for subsequent exercises:
++
+[source,role="execute"]
+----
+sudo touch /var/log/last-backup-timestamp
+----
+
+=== Verify
+
+The pre-patch check fails with a clear message identifying the violated policy gate.
+
+== Module summary
+
+You've successfully completed the CONTAIN module.
+
+**What you accomplished:**
+
+* Examined policy-as-code definitions for change management
+* Built a multi-node AAP workflow with approval gates
+* Executed policy-gated patching end-to-end
+* Generated compliance evidence automatically
+* Demonstrated policy violation detection
+
+**Key takeaways:**
+
+* Approval nodes provide human-in-the-loop without slowing automation
+* Policy gates are Ansible assertions — simple, auditable, version-controlled
+* `set_stats` provides a machine-readable audit trail across workflow nodes
+* Compliance reporting as a workflow step eliminates manual evidence gathering
+
+**Next steps:**
+Module 3 will validate and harden the system's compliance posture — proving the remediation meets organizational policy.

@@ -1,0 +1,333 @@
+include::partial$_attributes.adoc[]
+
+= Module 3: COMPLY — Audit, Harden, Deliver
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+The vulnerability is patched and the service is contained. But remediation alone doesn't satisfy Meridian Financial's compliance requirements — the security team needs **proof** that the system meets organizational baselines, and the application must be delivered as an immutable, scannable container.
+
+In this module you will run a compliance audit against OPA policies, apply CIS-aligned hardening, generate auditable evidence, build a hardened container image, scan it, and push it to registry — all orchestrated by AAP.
+
+== Learning objectives
+
+By the end of this module, you'll be able to:
+
+* Query OPA policy decisions from Ansible playbooks
+* Apply CIS benchmark-aligned hardening controls via AAP
+* Generate compliance evidence reports as workflow artifacts
+* Build, scan, and publish container images using Podman
+* Chain audit → harden → report → build → scan → push into an automated workflow
+
+== Exercise 1: Review the OPA Compliance Policies
+
+Before running the audit, examine the policies that define Meridian Financial's security baselines.
+
+. From the terminal, list the OPA policy bundles:
++
+[source,role="execute"]
+----
+curl -s http://central:8181/v1/policies | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for p in data.get('result', []):
+    print(f\"  {p['id']}\")
+"
+----
++
+You should see policies covering SELinux, firewall, SSH, services, and kernel parameters.
+
+. Examine the full compliance policy:
++
+[source,role="execute"]
+----
+curl -s http://central:8181/v1/policies/dcc/compliance | python3 -m json.tool
+----
++
+Note the 13 controls: each evaluates a specific security baseline and returns pass/fail.
+
+=== Verify
+
+OPA has loaded policy bundles that define auditable security baselines for the workshop systems.
+
+== Exercise 2: Run the Pre-Hardening Compliance Audit
+
+Run the audit playbook to evaluate the system's current compliance posture.
+
+. In AAP Controller, navigate to **Job Templates** and launch "Compliance Audit":
++
+Or from the terminal:
++
+[source,role="execute"]
+----
+cd /var/lib/awx/projects/defend-contain-comply/lab
+ansible-playbook playbooks/comply/compliance-audit.yml -i inventory/workshop.yml
+----
+
+. Review the audit results:
++
+[source,role="execute"]
+----
+cat /tmp/compliance-reports/audit-results-pre.json | python3 -m json.tool
+----
++
+Each control shows `pass` or `fail` with the control ID and category.
+
+. Check the summary:
++
+[source,role="execute"]
+----
+cat /tmp/compliance-reports/audit-results-pre.json | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+controls = data.get('controls', [])
+passed = sum(1 for c in controls if c.get('pass'))
+failed = sum(1 for c in controls if not c.get('pass'))
+print(f'Controls: {passed} passed, {failed} failed, {len(controls)} total')
+"
+----
+
+=== Verify
+
+* The audit completed and produced a structured JSON report
+* Some controls may already pass (from Module 1 hardening); others require CIS-level remediation
+* The `fail` entries identify exactly what needs to be fixed
+
+== Exercise 3: Apply CIS Hardening
+
+Run the hardening playbook that remediates failed compliance controls.
+
+. In AAP Controller, launch "CIS Harden":
++
+Or from the terminal:
++
+[source,role="execute"]
+----
+ansible-playbook playbooks/comply/cis-harden.yml -i inventory/workshop.yml
+----
+
+. Verify SSH hardening was applied:
++
+[source,role="execute"]
+----
+sudo sshd -T 2>/dev/null | grep -E "^(permitrootlogin|x11forwarding|maxauthtries|clientaliveinterval)"
+----
++
+Expected:
+
+* `permitrootlogin no`
+* `x11forwarding no`
+* `maxauthtries 4`
+* `clientaliveinterval 300`
+
+. Check file permission hardening:
++
+[source,role="execute"]
+----
+stat -c "%a %n" /etc/passwd /etc/shadow /etc/group /etc/gshadow
+----
++
+Expected: `644` for passwd/group, `000` for shadow/gshadow.
+
+. Verify kernel parameters:
++
+[source,role="execute"]
+----
+sysctl net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.send_redirects kernel.randomize_va_space
+----
++
+Expected: redirects = `0`, ASLR = `2`.
+
+. Confirm unnecessary services are disabled:
++
+[source,role="execute"]
+----
+systemctl is-enabled rpcbind 2>/dev/null; systemctl is-enabled avahi-daemon 2>/dev/null
+----
++
+Expected: `disabled` or `not-found`.
+
+=== Verify
+
+* SSH configuration matches CIS recommendations
+* File permissions are tightened
+* Kernel parameters are hardened
+* Unnecessary services are stopped and disabled
+
+== Exercise 4: Re-Audit and Generate Compliance Report
+
+Run the audit again to verify all controls now pass, then generate the formal compliance report.
+
+. Re-run the compliance audit:
++
+[source,role="execute"]
+----
+ansible-playbook playbooks/comply/compliance-audit.yml -i inventory/workshop.yml -e "audit_phase=post"
+----
+
+. Compare before and after:
++
+[source,role="execute"]
+----
+echo "=== PRE-HARDENING ===" && cat /tmp/compliance-reports/audit-results-pre.json | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+controls = data.get('controls', [])
+passed = sum(1 for c in controls if c.get('pass'))
+print(f'  {passed}/{len(controls)} controls passed')
+"
+echo ""
+echo "=== POST-HARDENING ===" && cat /tmp/compliance-reports/audit-results-post.json | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+controls = data.get('controls', [])
+passed = sum(1 for c in controls if c.get('pass'))
+print(f'  {passed}/{len(controls)} controls passed')
+"
+----
+
+. Generate the full HTML compliance report:
++
+[source,role="execute"]
+----
+ansible-playbook playbooks/comply/generate-compliance-report.yml -i inventory/workshop.yml
+----
+
+. Review the report:
++
+[source,role="execute"]
+----
+ls -la /tmp/compliance-reports/compliance-report-*.html
+----
+
+=== Verify
+
+* All controls pass in the post-hardening audit
+* The HTML report contains before/after comparison with control-level detail
+* The report is suitable for auditor review
+
+== Exercise 5: Build the Hardened Container Image
+
+Now deliver the patched, hardened application as an immutable container.
+
+. Examine the Containerfile template:
++
+[source,role="execute"]
+----
+cat /var/lib/awx/projects/defend-contain-comply/lab/templates/Containerfile.j2
+----
++
+Key security properties:
+
+* Based on `registry.access.redhat.com/ubi9/ubi-minimal` (Red Hat trusted base)
+* Installs only `httpd` and `mod_ssl` — minimal attack surface
+* Runs as `apache` user (non-root)
+* Labels include advisory and remediation metadata
+
+. In AAP Controller, launch "Build Hardened Container":
++
+Or from the terminal:
++
+[source,role="execute"]
+----
+ansible-playbook playbooks/comply/build-container.yml -i inventory/workshop.yml
+----
+
+. Verify the image was built:
++
+[source,role="execute"]
+----
+sudo podman images | grep dcc
+----
+
+=== Verify
+
+* A container image exists tagged with the advisory reference
+* The image is based on UBI9-minimal with patched httpd
+
+== Exercise 6: Scan the Image and Push to Registry
+
+. In AAP Controller, launch "Scan Image":
++
+Or from the terminal:
++
+[source,role="execute"]
+----
+ansible-playbook playbooks/comply/scan-image.yml -i inventory/workshop.yml
+----
+
+. Verify {target_cve} is **not** present in the scan results.
+
+. Push the verified image to the local registry:
++
+[source,role="execute"]
+----
+ansible-playbook playbooks/comply/push-to-registry.yml -i inventory/workshop.yml
+----
+
+. Verify the image is in the registry:
++
+[source,role="execute"]
+----
+curl -s http://localhost:5000/v2/_catalog | python3 -m json.tool
+----
+
+=== Verify
+
+* The image scan shows no critical vulnerabilities
+* The image is accessible from the local registry
+
+== Exercise 7: Run the Full Compliance Workflow
+
+Chain the full compliance and delivery process into a single AAP workflow.
+
+. In AAP Controller, navigate to **Resources → Workflow Templates** and open "Compliance and Hardening".
+
+. Examine the workflow topology:
++
+* **Compliance Audit (Pre)** — baseline evaluation
+* **CIS Harden** — apply remediation
+* **Compliance Audit (Post)** — verify remediation
+* **Compliance Report** — produce evidence
+* **Build Hardened Container** — containerize the application
+* **Scan Image** — verify the container
+* **Push to Registry** — publish to trusted registry
+
+. Launch the workflow.
+
+. Once complete, review the `set_stats` artifacts in the workflow job:
++
+* `pre_audit_pass_count` and `post_audit_pass_count`
+* `hardening_controls_applied`
+* `report_path`
+
+=== Verify
+
+The workflow completed end-to-end. All compliance controls pass, the report artifact is available, and the container image is in the registry.
+
+== Module summary
+
+You've successfully completed the COMPLY module — and the entire workshop.
+
+**What you accomplished:**
+
+* Queried OPA compliance policies from Ansible playbooks
+* Ran a baseline compliance audit identifying gaps
+* Applied CIS benchmark-aligned hardening controls
+* Re-audited to verify full compliance
+* Generated an HTML compliance report with before/after evidence
+* Built a hardened container image from a trusted base
+* Scanned and pushed it to a trusted registry
+* Executed the full workflow from audit to delivery
+
+**Key takeaways:**
+
+* OPA provides declarative, version-controlled compliance policies that Ansible can query at runtime
+* CIS benchmarks give concrete, actionable hardening controls — not abstract checklists
+* Before/after auditing creates an evidence trail that satisfies auditors
+* Container supply chains built from automation deliver immutable, scannable deployments
+* AAP workflows chain the entire compliance and delivery process into a single automation
+
+**Congratulations!** Proceed to the xref:99-conclusion.adoc[Conclusion] for a full recap.

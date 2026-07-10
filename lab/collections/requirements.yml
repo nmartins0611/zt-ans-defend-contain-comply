@@ -1,0 +1,12 @@
+---
+collections:
+  - name: ansible.controller
+  - name: ansible.posix
+    version: ">=1.5.0"
+  - name: ansible.utils
+    version: ">=2.10.0"
+  - name: containers.podman
+    version: ">=1.12.0"
+  - name: redhat.rhel_system_roles
+    version: ">=1.23.0"
+  - name: community.general

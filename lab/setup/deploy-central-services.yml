@@ -1,0 +1,162 @@
+---
+- name: Deploy central services (Splunk + OPA containers)
+  hosts: central
+  gather_facts: false
+  become: true
+
+  vars_files:
+    - vars/workshop.yml
+
+  tasks:
+    # ── Podman ─────────────────────────────────────────────────────────
+    - name: Ensure Podman is installed
+      ansible.builtin.dnf:
+        name:
+          - podman
+          - podman-plugins
+        state: present
+
+    # ── Firewall ───────────────────────────────────────────────────────
+    - name: Ensure firewalld is running
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Open service ports in firewall
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+      loop:
+        - "8000/tcp"
+        - "8088/tcp"
+        - "8089/tcp"
+        - "9997/tcp"
+        - "{{ opa_port }}/tcp"
+        - "{{ errata_repo_port }}/tcp"
+
+    # ── Splunk ─────────────────────────────────────────────────────────
+    - name: Create Splunk data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ splunk_data_dir }}/var"
+        - "{{ splunk_data_dir }}/etc"
+
+    - name: Deploy Splunk container
+      containers.podman.podman_container:
+        name: "{{ splunk_container_name }}"
+        image: "{{ splunk_image }}"
+        hostname: splunk
+        privileged: true
+        state: started
+        ports:
+          - "8000:8000"
+          - "8088:8088"
+          - "8089:8089"
+          - "9997:9997"
+        volumes:
+          - "{{ splunk_data_dir }}/var:/opt/splunk/var"
+          - "{{ splunk_data_dir }}/etc:/opt/splunk/etc"
+        env:
+          SPLUNK_START_ARGS: "--accept-license"
+          SPLUNK_GENERAL_TERMS: "--accept-sgt-current-at-splunk-com"
+          SPLUNK_PASSWORD: "{{ splunk_password }}"
+          SPLUNK_HEC_TOKEN: "{{ splunk_hec_token }}"
+      register: _splunk_container
+
+    - name: Generate systemd unit for Splunk
+      containers.podman.podman_generate_systemd:
+        name: "{{ splunk_container_name }}"
+        dest: /etc/systemd/system
+        restart_policy: always
+      register: _splunk_systemd
+
+    - name: Reload systemd and enable Splunk service
+      ansible.builtin.systemd:
+        name: "container-{{ splunk_container_name }}"
+        daemon_reload: true
+        enabled: true
+      when: _splunk_systemd is changed
+
+    # ── OPA ────────────────────────────────────────────────────────────
+    - name: Create OPA policy directory
+      ansible.builtin.file:
+        path: "{{ opa_policy_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy DCC compliance policies
+      ansible.builtin.copy:
+        src: files/opa-policies/
+        dest: "{{ opa_policy_dir }}/"
+        mode: "0644"
+      register: _opa_policies
+
+    - name: Deploy OPA container
+      containers.podman.podman_container:
+        name: "{{ opa_container_name }}"
+        image: "{{ opa_image }}"
+        state: started
+        ports:
+          - "{{ opa_port }}:{{ opa_port }}"
+        volumes:
+          - "{{ opa_policy_dir }}:/policies:z"
+        command: "run --server --addr=0.0.0.0:{{ opa_port }} /policies"
+      register: _opa_container
+
+    - name: Restart OPA if policies changed
+      containers.podman.podman_container:
+        name: "{{ opa_container_name }}"
+        state: started
+        force_restart: true
+      when: _opa_policies is changed and not _opa_container is changed
+
+    - name: Generate systemd unit for OPA
+      containers.podman.podman_generate_systemd:
+        name: "{{ opa_container_name }}"
+        dest: /etc/systemd/system
+        restart_policy: always
+      register: _opa_systemd
+
+    - name: Reload systemd and enable OPA service
+      ansible.builtin.systemd:
+        name: "container-{{ opa_container_name }}"
+        daemon_reload: true
+        enabled: true
+      when: _opa_systemd is changed
+
+    # ── Health Checks ──────────────────────────────────────────────────
+    - name: Wait for Splunk to be healthy
+      ansible.builtin.uri:
+        url: "https://localhost:{{ splunk_port }}/services/server/health/splunkd"
+        user: "{{ splunk_user }}"
+        password: "{{ splunk_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200]
+      retries: 60
+      delay: 10
+      register: _splunk_health
+      until: _splunk_health is succeeded
+
+    - name: Wait for OPA to be healthy
+      ansible.builtin.uri:
+        url: "http://localhost:{{ opa_port }}/health"
+        status_code: [200]
+      retries: 15
+      delay: 5
+      register: _opa_health
+      until: _opa_health is succeeded
+
+    - name: Report central services status
+      ansible.builtin.debug:
+        msg: |
+          Central services deployed:
+            Splunk:  http://{{ inventory_hostname }}:8000  (admin/{{ splunk_password }})
+            OPA:     http://{{ inventory_hostname }}:{{ opa_port }}
+            Errata:  (pending -- deployed by configure-errata-repo.yml)

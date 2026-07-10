@@ -93,87 +93,32 @@
       ansible.builtin.include_tasks: tasks/common-bootstrap.yml
 
 # Phase 3: Host-specific bootstrap in parallel
-# central: clone content repo, deploy Splunk + OPA containers
-# control: packages, collections install
+# central: packages, collections, clone repo, deploy Splunk + OPA containers
+# control: repos, packages, collections, clone repo, symlink awx.awx
 - name: Host-specific bootstrap
-  hosts: all:!localhost
+  hosts: central,control
   gather_facts: false
   become: true
   any_errors_fatal: true
   vars_files:
     - ../config/secrets.yaml
   vars:
-    satellite_url: "{{ lookup('ansible.builtin.env', 'SATELLITE_URL') }}"
-    satellite_org: "{{ lookup('ansible.builtin.env', 'SATELLITE_ORG') }}"
-    satellite_activationkey: "{{ lookup('ansible.builtin.env', 'SATELLITE_ACTIVATIONKEY') }}"
     guid: "{{ lookup('ansible.builtin.env', 'GUID') }}"
     domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
+    workshop_repo_url: "https://github.com/nmartins0611/zt-ans-defend-contain-comply.git"
+    workshop_repo_dest: /tmp/dcc-workshop
+    workshop_repo_branch: dev
   tasks:
-    - name: Create setup-scripts directory
-      ansible.builtin.file:
-        path: /tmp/setup-scripts/
-        state: directory
-        mode: '0755'
+    - name: Bootstrap central node
+      ansible.builtin.include_tasks: tasks/setup-central.yml
+      when: inventory_hostname == 'central'
 
-    - name: Check if bootstrap script exists
-      ansible.builtin.stat:
-        path: "{{ playbook_dir }}/setup-{{ inventory_hostname }}.sh"
-      delegate_to: localhost
-      become: false
-      register: r_script_test
-
-    - name: Copy bootstrap script
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/setup-{{ inventory_hostname }}.sh"
-        dest: "/tmp/setup-scripts/setup-{{ inventory_hostname }}.sh"
-        mode: '0755'
-      when: r_script_test.stat.exists
-
-    - name: Execute bootstrap script
-      ansible.builtin.shell: |
-        LOG=/tmp/setup-scripts/setup-{{ inventory_hostname }}-$(date +%Y%m%d-%H%M%S).log
-        sh -x /tmp/setup-scripts/setup-{{ inventory_hostname }}.sh > "$LOG" 2>&1
-        SCRIPT_RC=$?
-        ln -sf "$LOG" /tmp/setup-scripts/setup-{{ inventory_hostname }}-latest.log
-        exit $SCRIPT_RC
-      when: r_script_test.stat.exists
-      register: r_result
-      environment:
-        SATELLITE_URL: "{{ satellite_url }}"
-        SATELLITE_ORG: "{{ satellite_org }}"
-        SATELLITE_ACTIVATIONKEY: "{{ satellite_activationkey }}"
-        GUID: "{{ guid }}"
-        DOMAIN: "{{ domain }}"
-        REG_KEY: "{{ reg_username }}"
-        REG_PASS: "{{ reg_password }}"
-        SSH_KEY: "{{ ssh_key }}"
-        AH_TOKEN: "{{ ahtoken }}"
-        TMM_ID: "{{ tmm_activation }}"
-        TMM_ORG: "{{ tmm_orgid }}"
-
-    - name: Show bootstrap output
-      ansible.builtin.debug:
-        var: r_result.stdout_lines
-      when: r_result is defined and r_result.stdout_lines is defined
-
-    - name: Save bootstrap output
-      ansible.builtin.copy:
-        content: "{{ r_result.stdout | default(r_result.stderr) | default(r_result) }}"
-        dest: "/tmp/{{ inventory_hostname }}-bootstrap.out"
-      delegate_to: localhost
-      become: false
-      when: r_result is defined
-
-    - name: Fail if bootstrap failed
-      ansible.builtin.fail:
-        msg: "Bootstrap failed for {{ inventory_hostname }}"
-      when:
-        - r_result is defined
-        - r_result.rc is defined
-        - r_result.rc != 0
+    - name: Bootstrap control node
+      ansible.builtin.include_tasks: tasks/setup-control.yml
+      when: inventory_hostname == 'control'
 
 # Phase 4: Central configure
-# Runs DCC setup playbooks from content repo
+# Runs errata repo and Splunk alerts playbooks from cloned repo
 - name: Central service-dependent configuration
   hosts: central
   gather_facts: false
@@ -182,51 +127,13 @@
   vars_files:
     - ../config/secrets.yaml
   vars:
-    guid: "{{ lookup('ansible.builtin.env', 'GUID') }}"
-    domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
+    workshop_repo_dest: /tmp/dcc-workshop
   tasks:
-    - name: Copy central configure script
-      ansible.builtin.copy:
-        src: ./setup-central-configure.sh
-        dest: /tmp/setup-scripts/setup-central-configure.sh
-        mode: '0755'
-
-    - name: Execute central configure script
-      ansible.builtin.shell: |
-        LOG=/tmp/setup-scripts/setup-central-configure-$(date +%Y%m%d-%H%M%S).log
-        sh -x /tmp/setup-scripts/setup-central-configure.sh > "$LOG" 2>&1
-        SCRIPT_RC=$?
-        ln -sf "$LOG" /tmp/setup-scripts/setup-central-configure-latest.log
-        exit $SCRIPT_RC
-      register: r_central_configure
-      environment:
-        GUID: "{{ guid }}"
-        DOMAIN: "{{ domain }}"
-        AH_TOKEN: "{{ ahtoken }}"
-        TMM_ID: "{{ tmm_activation }}"
-        TMM_ORG: "{{ tmm_orgid }}"
-
-    - name: Show central configure output
-      ansible.builtin.debug:
-        var: r_central_configure.stdout_lines
-      when: r_central_configure.stdout_lines is defined
-
-    - name: Save central configure output
-      ansible.builtin.copy:
-        content: "{{ r_central_configure.stdout | default(r_central_configure.stderr) | default(r_central_configure) }}"
-        dest: /tmp/central-configure.out
-      delegate_to: localhost
-      become: false
-
-    - name: Fail if central configure failed
-      ansible.builtin.fail:
-        msg: "Central configure phase failed"
-      when:
-        - r_central_configure.rc is defined
-        - r_central_configure.rc != 0
+    - name: Configure central services
+      ansible.builtin.include_tasks: tasks/configure-central.yml
 
 # Phase 5: Control configure
-# Runs DCC AAP and EDA configuration playbooks
+# Waits for AAP, generates OAuth token, runs AAP/EDA configuration
 - name: Control AAP configuration
   hosts: control
   gather_facts: false
@@ -234,45 +141,7 @@
   vars_files:
     - ../config/secrets.yaml
   vars:
-    guid: "{{ lookup('ansible.builtin.env', 'GUID') }}"
-    domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
+    workshop_repo_dest: /tmp/dcc-workshop
   tasks:
-    - name: Copy control configure script
-      ansible.builtin.copy:
-        src: ./setup-control-configure.sh
-        dest: /tmp/setup-scripts/setup-control-configure.sh
-        mode: '0755'
-
-    - name: Execute control configure script
-      ansible.builtin.shell: |
-        LOG=/tmp/setup-scripts/setup-control-configure-$(date +%Y%m%d-%H%M%S).log
-        sh -x /tmp/setup-scripts/setup-control-configure.sh > "$LOG" 2>&1
-        SCRIPT_RC=$?
-        ln -sf "$LOG" /tmp/setup-scripts/setup-control-configure-latest.log
-        exit $SCRIPT_RC
-      register: r_control_configure
-      environment:
-        GUID: "{{ guid }}"
-        DOMAIN: "{{ domain }}"
-        AH_TOKEN: "{{ ahtoken }}"
-        TMM_ID: "{{ tmm_activation }}"
-        TMM_ORG: "{{ tmm_orgid }}"
-
-    - name: Show control configure output
-      ansible.builtin.debug:
-        var: r_control_configure.stdout_lines
-      when: r_control_configure.stdout_lines is defined
-
-    - name: Save control configure output
-      ansible.builtin.copy:
-        content: "{{ r_control_configure.stdout | default(r_control_configure.stderr) | default(r_control_configure) }}"
-        dest: /tmp/control-configure.out
-      delegate_to: localhost
-      become: false
-
-    - name: Fail if control configure failed
-      ansible.builtin.fail:
-        msg: "Control configure phase failed"
-      when:
-        - r_control_configure.rc is defined
-        - r_control_configure.rc != 0
+    - name: Configure AAP and EDA
+      ansible.builtin.include_tasks: tasks/configure-control.yml

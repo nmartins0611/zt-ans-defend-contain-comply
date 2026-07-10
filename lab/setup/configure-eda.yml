@@ -1,0 +1,206 @@
+---
+- name: Configure EDA Controller for DCC workshop
+  hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars_files:
+    - vars/workshop.yml
+
+  vars:
+    eda_api: "{{ eda_host }}/api/eda/v1"
+    eda_auth:
+      username: "{{ eda_user }}"
+      password: "{{ eda_password }}"
+    eda_webhook_token: "{{ eda_webhook_token_value | default('dcc-workshop-webhook-token') }}"
+
+  tasks:
+    # ── Wait for EDA Controller ────────────────────────────────────────
+    - name: Wait for EDA Controller API to be ready
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/users/me/"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200]
+      retries: 30
+      delay: 10
+      register: _eda_ready
+      until: _eda_ready is succeeded
+
+    # ── AAP Controller token for EDA ──────────────────────────────────
+    - name: Generate AAP Controller token for EDA
+      ansible.builtin.uri:
+        url: "{{ aap_host }}/api/controller/v2/tokens/"
+        method: POST
+        user: "{{ aap_user }}"
+        password: "{{ aap_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          description: "EDA Controller token for DCC workshop"
+          scope: write
+        status_code: [201]
+      register: _eda_controller_token
+
+    # ── EDA Credential for AAP ─────────────────────────────────────────
+    - name: Check existing EDA credentials
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/eda-credentials/?name=DCC+Controller+Token"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _existing_cred
+
+    - name: Create EDA credential for AAP Controller
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/eda-credentials/"
+        method: POST
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          name: "DCC Controller Token"
+          credential_type_id: 1
+          inputs:
+            host: "{{ aap_host }}"
+            oauth_token: "{{ _eda_controller_token.json.token }}"
+            ssl_verify: "no"
+        status_code: [201]
+      when: _existing_cred.json.count == 0
+
+    # ── EDA Project ────────────────────────────────────────────────────
+    - name: Check existing EDA projects
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/projects/?name=Defend%2C+Contain%2C+Comply"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _existing_project
+
+    - name: Create EDA project
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/projects/"
+        method: POST
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          name: "{{ workshop_project_name }}"
+          url: "{{ gitea_url }}/{{ gitea_repo }}.git"
+          scm_branch: master
+        status_code: [201]
+      register: _eda_project
+      when: _existing_project.json.count == 0
+
+    - name: Get EDA project ID
+      ansible.builtin.set_fact:
+        eda_project_id: >-
+          {{ _eda_project.json.id | default(_existing_project.json.results[0].id) }}
+
+    - name: Wait for EDA project sync
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/projects/{{ eda_project_id }}/"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _project_status
+      retries: 30
+      delay: 5
+      until: _project_status.json.import_state | default('') == 'completed'
+
+    # ── Event Stream ───────────────────────────────────────────────────
+    - name: Check existing event streams
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/event-streams/?name=DCC+Splunk+Events"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _existing_stream
+
+    - name: Get EDA credential ID
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/eda-credentials/?name=DCC+Controller+Token"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _cred_lookup
+
+    - name: Create event stream for Splunk webhooks
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/event-streams/"
+        method: POST
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          name: "DCC Splunk Events"
+          eda_credential_id: "{{ _cred_lookup.json.results[0].id }}"
+          event_stream_type: "basic"
+          test_mode: false
+        status_code: [201]
+      when: _existing_stream.json.count == 0
+
+    # ── Rulebook Activation ────────────────────────────────────────────
+    - name: Check existing rulebook activations
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/activations/?name=DCC+CVE+Alert+Responder"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _existing_activation
+
+    - name: Get default Decision Environment ID
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/decision-environments/"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: _de_list
+
+    - name: Create rulebook activation
+      ansible.builtin.uri:
+        url: "{{ eda_api }}/activations/"
+        method: POST
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: json
+        body:
+          name: "DCC CVE Alert Responder"
+          project_id: "{{ eda_project_id }}"
+          rulebook: "lab/rulebooks/splunk-cve-alert.yml"
+          decision_environment_id: "{{ _de_list.json.results[0].id }}"
+          eda_credential_id: "{{ _cred_lookup.json.results[0].id }}"
+          restart_policy: always
+          is_enabled: true
+          extra_var: "EDA_WEBHOOK_TOKEN: {{ eda_webhook_token }}"
+        status_code: [201]
+      when: _existing_activation.json.count == 0
+
+    # ── Verification ───────────────────────────────────────────────────
+    - name: Report EDA configuration status
+      ansible.builtin.debug:
+        msg: |
+          EDA Controller configured for DCC workshop:
+            Project:             {{ workshop_project_name }}
+            Event Stream:        DCC Splunk Events
+            Rulebook Activation: DCC CVE Alert Responder
+            Webhook Token:       {{ eda_webhook_token }}
+            Controller Token:    generated

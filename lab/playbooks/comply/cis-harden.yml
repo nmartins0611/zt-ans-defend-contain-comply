@@ -1,0 +1,122 @@
+---
+- name: Apply CIS benchmark-aligned hardening
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    sysctl_hardening:
+      net.ipv4.conf.all.accept_redirects: 0
+      net.ipv4.conf.default.accept_redirects: 0
+      net.ipv4.conf.all.send_redirects: 0
+      net.ipv4.conf.all.accept_source_route: 0
+      net.ipv4.conf.all.log_martians: 1
+      net.ipv6.conf.all.accept_redirects: 0
+      kernel.randomize_va_space: 2
+    unnecessary_services:
+      - rpcbind
+      - avahi-daemon
+
+  tasks:
+    # ── SSH Hardening ───────────────────────────────────────────────
+    - name: Harden SSH configuration
+      ansible.builtin.copy:
+        content: |
+          PermitRootLogin no
+          X11Forwarding no
+          MaxAuthTries 4
+          ClientAliveInterval 300
+          ClientAliveCountMax 0
+          PermitEmptyPasswords no
+          IgnoreRhosts yes
+          HostbasedAuthentication no
+          Banner /etc/issue.net
+        dest: /etc/ssh/sshd_config.d/99-cis-hardening.conf
+        mode: "0600"
+        owner: root
+        group: root
+      notify: Restart sshd
+
+    - name: Set SSH login banner
+      ansible.builtin.copy:
+        content: |
+          Authorized users only. All activity may be monitored and reported.
+        dest: /etc/issue.net
+        mode: "0644"
+
+    # ── File Permissions ────────────────────────────────────────────
+    - name: Set restrictive permissions on sensitive files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+        owner: root
+        group: "{{ item.group | default('root') }}"
+      loop:
+        - { path: /etc/passwd, mode: "0644" }
+        - { path: /etc/group, mode: "0644" }
+        - { path: /etc/shadow, mode: "0000", group: root }
+        - { path: /etc/gshadow, mode: "0000", group: root }
+        - { path: /etc/ssh/sshd_config, mode: "0600" }
+
+    # ── Kernel Parameters ───────────────────────────────────────────
+    - name: Apply kernel sysctl hardening
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: true
+        reload: true
+        state: present
+      loop: "{{ sysctl_hardening | dict2items }}"
+
+    # ── Service Minimization ────────────────────────────────────────
+    - name: Stop and disable unnecessary services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ unnecessary_services }}"
+      failed_when: false
+
+    # ── Login Hardening ─────────────────────────────────────────────
+    - name: Set restrictive umask in login.defs
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: "^UMASK"
+        line: "UMASK 027"
+
+    - name: Disable core dumps
+      ansible.builtin.lineinfile:
+        path: /etc/security/limits.conf
+        line: "* hard core 0"
+        create: true
+        mode: "0644"
+
+    - name: Restrict cron access to root
+      ansible.builtin.copy:
+        content: "root\n"
+        dest: /etc/cron.allow
+        mode: "0600"
+        owner: root
+        group: root
+
+    # ── Report ──────────────────────────────────────────────────────
+    - name: Report hardening completion
+      ansible.builtin.debug:
+        msg: |
+          CIS hardening applied on {{ inventory_hostname }}:
+            - SSH: root login disabled, X11 off, max auth 4, alive interval 300s
+            - Files: shadow/gshadow locked, sshd_config restricted
+            - Kernel: redirects disabled, ASLR enabled, martian logging on
+            - Services: {{ unnecessary_services | join(', ') }} disabled
+            - Login: umask 027, core dumps disabled, cron restricted
+
+    - name: Set hardening stats for workflow
+      ansible.builtin.set_stats:
+        data:
+          hardening_controls_applied: 7
+          hardening_host: "{{ inventory_hostname }}"
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.systemd:
+        name: sshd
+        state: restarted

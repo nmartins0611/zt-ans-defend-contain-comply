@@ -1,0 +1,30 @@
+---
+# DCC Workshop Setup -- Master Orchestrator
+#
+# Runs all setup playbooks in dependency order:
+#   Phase 0: Central services (Splunk + OPA containers)
+#   Phase 1: System-level (errata repo, app server -- can run in parallel)
+#   Phase 2: Splunk alerts (requires central VM services)
+#   Phase 3: AAP + EDA (requires Gitea repo and running controllers)
+
+# ── Phase 0: Central Services ────────────────────────────────────────
+- name: "Phase 0: Deploy Splunk and OPA containers on central"
+  ansible.builtin.import_playbook: deploy-central-services.yml
+
+# ── Phase 1: System Preparation ──────────────────────────────────────
+- name: "Phase 1a: Configure errata repository on central VM"
+  ansible.builtin.import_playbook: configure-errata-repo.yml
+
+- name: "Phase 1b: Prepare app server for workshop"
+  ansible.builtin.import_playbook: configure-app-server.yml
+
+# ── Phase 2: SIEM Integration ────────────────────────────────────────
+- name: "Phase 2: Configure Splunk alerts and webhook"
+  ansible.builtin.import_playbook: configure-splunk-alerts.yml
+
+# ── Phase 3: Automation Platform ─────────────────────────────────────
+- name: "Phase 3a: Configure AAP Controller resources"
+  ansible.builtin.import_playbook: configure-aap.yml
+
+- name: "Phase 3b: Configure EDA Controller"
+  ansible.builtin.import_playbook: configure-eda.yml

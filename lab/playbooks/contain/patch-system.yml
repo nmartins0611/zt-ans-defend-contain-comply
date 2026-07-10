@@ -1,0 +1,101 @@
+---
+- name: Apply security patch with rollback support
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
+    target_service: "{{ target_service | default('httpd') }}"
+    snapshot_enabled: true
+
+  tasks:
+    - name: Record pre-patch package state
+      ansible.builtin.command:
+        cmd: rpm -qa --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n'
+      register: _pre_patch_packages
+      changed_when: false
+
+    - name: Save pre-patch package list
+      ansible.builtin.copy:
+        content: "{{ _pre_patch_packages.stdout }}"
+        dest: /tmp/pre-patch-packages.txt
+        mode: "0644"
+
+    - name: Record current service version
+      ansible.builtin.command:
+        cmd: "rpm -q {{ target_service }}"
+      register: _pre_patch_version
+      changed_when: false
+
+    - name: Create dnf transaction snapshot
+      ansible.builtin.command:
+        cmd: dnf history list --reverse
+      register: _dnf_history_pre
+      changed_when: false
+      when: snapshot_enabled | bool
+
+    - name: Apply security advisory patch
+      ansible.builtin.dnf:
+        name: "*"
+        security: true
+        advisory: "{{ target_advisory }}"
+        state: latest
+      register: _patch_result
+
+    - name: Record post-patch service version
+      ansible.builtin.command:
+        cmd: "rpm -q {{ target_service }}"
+      register: _post_patch_version
+      changed_when: false
+
+    - name: Report patch application result
+      ansible.builtin.debug:
+        msg: |
+          Patch application summary:
+            Advisory: {{ target_advisory }}
+            Service: {{ target_service }}
+            Before:  {{ _pre_patch_version.stdout }}
+            After:   {{ _post_patch_version.stdout }}
+            Changed: {{ _patch_result.changed }}
+
+    - name: Restart patched service
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+        state: restarted
+      when: _patch_result.changed
+
+    - name: Wait for service to stabilize
+      ansible.builtin.wait_for:
+        port: "{{ service_port | default(443) }}"
+        delay: 5
+        timeout: 60
+
+    - name: Verify service is healthy post-restart
+      ansible.builtin.uri:
+        url: "https://localhost:{{ service_port | default(443) }}/"
+        validate_certs: false
+        status_code: [200, 301, 302, 403]
+      register: _health_check
+      retries: 3
+      delay: 5
+      until: _health_check is succeeded
+
+    - name: Notify Splunk of patch application
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/splunk-hec-event.yml"
+      vars:
+        splunk_event_data:
+          action: patch_applied
+          host: "{{ inventory_hostname }}"
+          advisory: "{{ target_advisory }}"
+          pre_version: "{{ _pre_patch_version.stdout }}"
+          post_version: "{{ _post_patch_version.stdout }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          message: "Advisory {{ target_advisory }} applied: {{ _pre_patch_version.stdout }} -> {{ _post_patch_version.stdout }}"
+
+    - name: Set patch result facts
+      ansible.builtin.set_stats:
+        data:
+          patch_applied: "{{ _patch_result.changed }}"
+          patch_advisory: "{{ target_advisory }}"
+          pre_version: "{{ _pre_patch_version.stdout }}"
+          post_version: "{{ _post_patch_version.stdout }}"

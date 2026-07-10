@@ -1,0 +1,206 @@
+---
+- name: Prepare app server for DCC workshop
+  hosts: appservers
+  gather_facts: true
+  become: true
+
+  vars_files:
+    - vars/workshop.yml
+
+  tasks:
+    # ── SELinux ────────────────────────────────────────────────────────
+    - name: Ensure SELinux is enforcing
+      ansible.posix.selinux:
+        policy: targeted
+        state: enforcing
+
+    - name: Activate enforcing mode without reboot
+      ansible.builtin.command: setenforce 1
+      changed_when: true
+      failed_when: false
+
+    # ── Firewalld ──────────────────────────────────────────────────────
+    - name: Ensure firewalld is installed and running
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Check if internal-only zone exists
+      ansible.builtin.command: firewall-cmd --info-zone=internal-only
+      register: _zone_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create internal-only firewall zone
+      ansible.builtin.command: firewall-cmd --permanent --new-zone=internal-only
+      when: _zone_check.rc != 0
+      register: _zone_created
+      changed_when: _zone_created.rc == 0
+
+    - name: Reload firewall to activate new zone
+      ansible.builtin.command: firewall-cmd --reload
+      when: _zone_created is changed
+      changed_when: true
+
+    - name: Allow http and https in public zone
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        zone: public
+        permanent: true
+        immediate: true
+        state: enabled
+      loop:
+        - http
+        - https
+
+    # ── httpd (vulnerable version) ─────────────────────────────────────
+    - name: Install vulnerable httpd version
+      ansible.builtin.dnf:
+        name: "httpd-{{ vulnerable_httpd_version }}"
+        state: present
+        allow_downgrade: true
+
+    - name: Install mod_ssl
+      ansible.builtin.dnf:
+        name: mod_ssl
+        state: present
+
+    - name: Deploy Meridian Financial landing page
+      ansible.builtin.copy:
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>{{ company_name }} - Customer Portal</title>
+            <style>
+              body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 40px;
+                     background: #f5f5f5; color: #1a1a1a; }
+              .container { max-width: 800px; margin: 0 auto; background: white;
+                           padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+              h1 { color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; }
+              .status { background: #e8f5e9; padding: 15px; border-radius: 4px;
+                        border-left: 4px solid #2e7d32; margin: 20px 0; }
+              .footer { margin-top: 30px; font-size: 0.9rem; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>{{ company_name }}</h1>
+              <h2>Customer Portal</h2>
+              <div class="status">
+                <strong>System Status:</strong> Operational
+              </div>
+              <p>Welcome to the {{ company_name }} secure customer portal.</p>
+              <p>This application server processes financial transactions and
+                 requires the highest security posture.</p>
+              <div class="footer">
+                <p>Internal use only. Unauthorized access is prohibited.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        dest: /var/www/html/index.html
+        owner: apache
+        group: apache
+        mode: "0644"
+
+    - name: Enable and start httpd
+      ansible.builtin.systemd:
+        name: httpd
+        state: started
+        enabled: true
+
+    # ── Errata repo configuration ──────────────────────────────────────
+    - name: Configure errata repository on app server
+      ansible.builtin.template:
+        src: templates/errata-repo.repo.j2
+        dest: /etc/yum.repos.d/dcc-errata.repo
+        mode: "0644"
+      vars:
+        central_host: "{{ hostvars['central']['ansible_host'] | default('central') }}"
+
+    - name: Verify errata repo is reachable
+      ansible.builtin.command: dnf repolist dcc-errata
+      register: _repolist
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: "'dcc-errata' in _repolist.stdout"
+
+    - name: Verify CVE appears in advisory list
+      ansible.builtin.command: yum updateinfo list cves --quiet
+      register: _cve_check
+      changed_when: false
+
+    - name: Confirm target CVE is detectable
+      ansible.builtin.assert:
+        that:
+          - target_cve in _cve_check.stdout
+        fail_msg: >-
+          {{ target_cve }} not found in advisory list. Check that the errata repo
+          is serving updateinfo.xml and the vulnerable httpd version is installed.
+        success_msg: "{{ target_cve }} detected -- errata repo and vulnerable httpd are correctly staged."
+
+    # ── Backup marker for policy gate ──────────────────────────────────
+    - name: Create backup marker file for pre-patch policy gate
+      ansible.builtin.file:
+        path: /var/log/last-backup-timestamp
+        state: touch
+        mode: "0644"
+        modification_time: preserve
+        access_time: preserve
+
+    # ── Podman (Module 3) ──────────────────────────────────────────────
+    - name: Ensure Podman is installed
+      ansible.builtin.dnf:
+        name: podman
+        state: present
+
+    - name: Pre-pull UBI minimal base image
+      containers.podman.podman_image:
+        name: registry.access.redhat.com/ubi9/ubi-minimal
+        tag: latest
+      register: _ubi_pull
+      retries: 3
+      delay: 10
+      until: _ubi_pull is succeeded
+
+    - name: Pre-pull registry image for local container registry
+      containers.podman.podman_image:
+        name: docker.io/library/registry
+        tag: "2"
+      register: _registry_pull
+      retries: 3
+      delay: 10
+      until: _registry_pull is succeeded
+
+    # ── Verification ───────────────────────────────────────────────────
+    - name: Gather verification data
+      block:
+        - name: Get installed httpd version
+          ansible.builtin.command: rpm -q httpd
+          register: _httpd_version
+          changed_when: false
+
+        - name: Get SELinux status
+          ansible.builtin.command: getenforce
+          register: _selinux
+          changed_when: false
+
+        - name: Get firewalld status
+          ansible.builtin.command: firewall-cmd --state
+          register: _firewall
+          changed_when: false
+
+    - name: Report app server readiness
+      ansible.builtin.debug:
+        msg: |
+          App server ready for DCC workshop:
+            httpd:     {{ _httpd_version.stdout }}
+            SELinux:   {{ _selinux.stdout }}
+            Firewall:  {{ _firewall.stdout }}
+            CVE staged: {{ target_cve }}
+            Podman:    installed
+            Backup:    /var/log/last-backup-timestamp present

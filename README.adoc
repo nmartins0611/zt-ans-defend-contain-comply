@@ -2,8 +2,7 @@
 :toc: auto
 
 A hands-on workshop demonstrating automated vulnerability response, policy-gated
-patching, and container supply-chain compliance using Red Hat Ansible Automation
-Platform.
+patching, and compliance hardening using Red Hat Ansible Automation Platform.
 
 == Workshop Modules
 
@@ -11,17 +10,14 @@ Platform.
 |===
 | Module | Focus
 
-| *DEFEND*
+| *DEFEND -- Detect and Contain*
 | Detect CVE-2024-38476 in Apache httpd, contain the vulnerable service, and harden the system posture -- all driven by Event-Driven Ansible responding to Splunk alerts.
 
-| *CONTAIN*
-| Apply the RHSA-2024:5138 patch through a policy-gated workflow with pre-patch validation, approval gates, post-patch verification, and compliance reporting.
+| *CONTAIN -- Policy-Gated Remediation*
+| Apply the RHSA-2024:5138 patch through an OPA policy-gated workflow with pre-patch validation, approval gates, post-patch verification, and compliance reporting.
 
-| *COMPLY*
-| Validate the system against OPA compliance policies, apply CIS-aligned hardening, and generate auditable evidence for the security team.
-
-| *SUPPLY CHAIN*
-| Build a hardened container image from the patched system, scan it for vulnerabilities, and push it to a local registry -- establishing a compliant supply chain.
+| *COMPLY -- Audit, Harden, Deliver*
+| Run a 13-control OPA compliance audit, apply CIS-aligned hardening, generate before/after evidence, then build a hardened container image, scan it, and push to a registry.
 |===
 
 == Architecture
@@ -39,15 +35,33 @@ Platform.
 
 == Repository Structure
 
-* `config/` -- VM topology, firewall rules, secrets
-* `content/` -- Antora lab guide (AsciiDoc)
-* `setup-automation/` -- Provisioning playbooks and bootstrap scripts
-* `runtime-automation/` -- Module transition scripts (progressive content reveal)
-
-== Content Repository
-
-The workshop playbooks, roles, EDA rulebooks, and setup automation live in a
-separate content repository: https://github.com/nmartins-redhat/defend-contain-comply
+[source]
+----
+zt-ans-defend-contain-comply/
+├── config/                        # VM topology, firewall rules, secrets
+├── content/                       # Showroom Antora pages (thin navigation)
+├── setup-automation/
+│   ├── main.yml                   # Pure Ansible orchestration (5 phases)
+│   ├── recover-after-restart.yml  # Post-reboot service recovery
+│   ├── ansible.cfg
+│   └── tasks/
+│       ├── common-bootstrap.yml   # SSH, SELinux, networking, RHSM
+│       ├── setup-central.yml      # Packages, collections, clone repo, deploy containers
+│       ├── setup-control.yml      # Repos, collections, clone repo, symlinks
+│       ├── configure-central.yml  # Run errata repo + Splunk alerts playbooks
+│       └── configure-control.yml  # Wait for AAP, OAuth token, run AAP/EDA config
+├── lab/                           # Workshop content (playbooks, setup, exercises)
+│   ├── playbooks/                 # Exercise playbooks (defend/, contain/, comply/)
+│   ├── setup/                     # AAP/EDA/app-server configure playbooks
+│   ├── inventory/                 # workshop.yml
+│   ├── templates/                 # Containerfile, compliance reports, Splunk payload
+│   ├── rulebooks/                 # EDA rulebooks
+│   ├── collections/               # requirements.yml
+│   ├── policies/                  # patch-policy.yml
+│   └── content/                   # Lab guide AsciiDoc (detailed exercises)
+├── ui-config.yml
+└── README.adoc
+----
 
 == Prerequisites
 

@@ -1,0 +1,80 @@
+---
+- name: Generate compliance evidence report with before/after comparison
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    report_output_dir: /tmp/compliance-reports
+    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
+    organization: Meridian Financial
+
+  tasks:
+    - name: Ensure report directory exists
+      ansible.builtin.file:
+        path: "{{ report_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Read pre-hardening audit results
+      ansible.builtin.slurp:
+        src: "{{ report_output_dir }}/audit-results-pre.json"
+      register: _pre_audit_raw
+      failed_when: false
+
+    - name: Read post-hardening audit results
+      ansible.builtin.slurp:
+        src: "{{ report_output_dir }}/audit-results-post.json"
+      register: _post_audit_raw
+      failed_when: false
+
+    - name: Parse audit results
+      ansible.builtin.set_fact:
+        pre_audit: "{{ (_pre_audit_raw.content | b64decode | from_json) if _pre_audit_raw is succeeded else {} }}"
+        post_audit: "{{ (_post_audit_raw.content | b64decode | from_json) if _post_audit_raw is succeeded else {} }}"
+
+    - name: Gather current system evidence
+      ansible.builtin.command:
+        cmd: "{{ item.cmd }}"
+      register: _evidence
+      changed_when: false
+      loop:
+        - { name: httpd_version, cmd: "rpm -q httpd" }
+        - { name: sestatus, cmd: "sestatus" }
+        - { name: firewall, cmd: "firewall-cmd --list-all" }
+        - { name: ports, cmd: "ss -tlnp" }
+        - { name: sshd, cmd: "sshd -T" }
+
+    - name: Generate HTML compliance report
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/compliance-report-full.html.j2"
+        dest: "{{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html"
+        mode: "0644"
+      vars:
+        report_data:
+          host: "{{ inventory_hostname }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          cve: "{{ target_cve }}"
+          advisory: "{{ target_advisory }}"
+          organization: "{{ organization }}"
+          httpd_version: "{{ _evidence.results[0].stdout }}"
+          selinux_status: "{{ _evidence.results[1].stdout }}"
+          firewall_config: "{{ _evidence.results[2].stdout }}"
+          listening_ports: "{{ _evidence.results[3].stdout }}"
+          ssh_config: "{{ _evidence.results[4].stdout_lines | select('match', '^(permitrootlogin|x11forwarding|maxauthtries|clientaliveinterval)') | list | join('\n') }}"
+          pre_audit: "{{ pre_audit }}"
+          post_audit: "{{ post_audit }}"
+
+    - name: Report location
+      ansible.builtin.debug:
+        msg: >-
+          Compliance report generated:
+          {{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html
+
+    - name: Set report stats for workflow
+      ansible.builtin.set_stats:
+        data:
+          report_path: "{{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html"
+          pre_audit_passed: "{{ pre_audit.passed | default('N/A') }}"
+          post_audit_passed: "{{ post_audit.passed | default('N/A') }}"
+          post_audit_compliant: "{{ post_audit.compliant | default(false) }}"

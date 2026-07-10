@@ -1,0 +1,29 @@
+{
+  "source": "splunk",
+  "event_type": "alert",
+  "severity": "critical",
+  "cve_id": "CVE-2024-38476",
+  "title": "Apache HTTP Server SSRF via mod_rewrite",
+  "description": "Apache HTTP Server versions 2.4.59 and earlier are vulnerable to SSRF in mod_rewrite configurations that allow unsafe RewriteRules.",
+  "host": "app-server",
+  "host_ip": "192.168.1.100",
+  "service": "httpd",
+  "port": 443,
+  "cvss_score": 9.8,
+  "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+  "patch_available": false,
+  "advisory_id": null,
+  "affected_packages": [
+    "httpd-2.4.57-5.el9"
+  ],
+  "detection_method": "Splunk Enterprise Security - Vulnerability Correlation",
+  "splunk_search": "index=vulnerability sourcetype=nessus cve=\"CVE-2024-38476\" severity=critical",
+  "timestamp": "2024-08-15T14:32:00Z",
+  "organization": "Meridian Financial",
+  "environment": "production",
+  "asset_criticality": "high",
+  "compliance_frameworks": [
+    "PCI-DSS 6.2",
+    "NIST SP 800-53 SI-2"
+  ]
+}

@@ -1,0 +1,27 @@
+# Hardened application container for Meridian Financial
+# Built by AAP Vulnerability Management Workflow
+FROM {{ base_image }}
+
+LABEL maintainer="platform-team@meridian.example.com" \
+      description="Hardened httpd application - post-remediation" \
+      version="{{ container_tag | default('latest') }}" \
+      security.remediated="true" \
+      security.advisory="{{ target_advisory | default('RHSA-2024:5138') }}"
+
+RUN microdnf install -y httpd mod_ssl && \
+    microdnf clean all && \
+    rm -rf /var/cache/yum
+
+COPY httpd.conf /etc/httpd/conf/httpd.conf
+COPY index.html /var/www/html/index.html
+
+RUN chown -R apache:apache /var/www/html && \
+    chown -R apache:apache /etc/httpd/logs && \
+    chown -R apache:apache /run/httpd && \
+    chmod -R 0755 /var/www/html
+
+EXPOSE {{ service_port | default('8443') }}
+
+USER apache
+
+CMD ["httpd", "-D", "FOREGROUND", "-f", "/etc/httpd/conf/httpd.conf"]
