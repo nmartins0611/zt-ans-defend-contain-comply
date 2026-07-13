@@ -43,23 +43,21 @@
       ansible.builtin.set_fact:
         eda_org_id: "{{ _eda_org.json.results[0].id }}"
 
-    # ── AAP Controller token for EDA ──────────────────────────────────
-    - name: Generate AAP Controller token for EDA
+    # ── EDA Credential for AAP ─────────────────────────────────────────
+    - name: Look up AAP credential type in EDA
       ansible.builtin.uri:
-        url: "{{ aap_host }}/api/controller/v2/tokens/"
-        method: POST
-        user: "{{ aap_user }}"
-        password: "{{ aap_password }}"
+        url: "{{ eda_api }}/credential-types/?name={{ 'Red Hat Ansible Automation Platform' | urlencode }}"
+        user: "{{ eda_user }}"
+        password: "{{ eda_password }}"
         validate_certs: false
         force_basic_auth: true
-        body_format: json
-        body:
-          description: "EDA Controller token for DCC workshop"
-          scope: write
-        status_code: [201]
-      register: _eda_controller_token
+        status_code: [200]
+      register: _eda_aap_cred_type
 
-    # ── EDA Credential for AAP ─────────────────────────────────────────
+    - name: Set EDA AAP credential type ID
+      ansible.builtin.set_fact:
+        eda_aap_cred_type_id: "{{ _eda_aap_cred_type.json.results[0].id }}"
+
     - name: Check existing EDA credentials
       ansible.builtin.uri:
         url: "{{ eda_api }}/eda-credentials/?name=DCC+Controller+Token"
@@ -81,11 +79,12 @@
         body:
           name: "DCC Controller Token"
           organization_id: "{{ eda_org_id }}"
-          credential_type_id: 1
+          credential_type_id: "{{ eda_aap_cred_type_id | int }}"
           inputs:
-            host: "{{ aap_host }}"
-            oauth_token: "{{ _eda_controller_token.json.token }}"
-            ssl_verify: "no"
+            host: "{{ aap_host }}/api/controller/"
+            username: "{{ aap_user }}"
+            password: "{{ aap_password }}"
+            verify_ssl: false
         status_code: [201]
       when: _existing_cred.json.count == 0
 
