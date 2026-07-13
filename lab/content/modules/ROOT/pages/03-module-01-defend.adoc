@@ -91,7 +91,7 @@ Splunk shows the detection, but you need to confirm the CVE actually exists on t
 * Username: `admin`
 * Password: `{aap_admin_password}`
 
-. Navigate to **Resources → Templates** and find the **Scan System** job template.
+. Navigate to **Resources → Templates** and find the **DEFEND - Scan System** job template.
 
 . Click the rocket icon to **Launch** the job template. When prompted for a **Limit**, enter `app-server` to target only rhel01.
 
@@ -104,7 +104,7 @@ The CVE is confirmed. The vulnerable `httpd-2.4.57-5.el9` package is installed o
 
 ==== Verify
 
-* The Scan System job completes successfully
+* The DEFEND - Scan System job completes successfully
 * Job output confirms {target_cve} is detected on `rhel01`
 
 === Exercise 3: Manually Run the Containment Workflow
@@ -122,9 +122,9 @@ Now contain the threat by running the Vulnerability Containment workflow manuall
 
 . Watch the workflow execute three steps in sequence:
 +
-* **Scan System** — confirms {target_cve} is present
-* **Contain Service** — restricts network access and hardens httpd configuration
-* **Harden Posture** — applies SELinux booleans and deploys file integrity monitoring
+* **DEFEND - Scan System** — confirms {target_cve} is present
+* **DEFEND - Contain Service** — restricts network access and hardens httpd configuration
+* **DEFEND - Harden Posture** — applies SELinux booleans and deploys file integrity monitoring
 
 . Wait for the workflow to complete successfully.
 
@@ -351,7 +351,7 @@ The EDA credential, project, and decision environment are already configured. Yo
 
 Now deploy the same vulnerable application to a second server.
 
-. In AAP Controller, navigate to **Resources → Templates** and find the **Deploy Application** job template.
+. In AAP Controller, navigate to **Resources → Templates** and find the **DEFEND - Deploy Application** job template.
 
 . Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `app-server-2` to target only rhel02.
 
@@ -370,7 +370,7 @@ You should now see events for **both** `rhel01` and `app-server-2`.
 
 ==== Verify
 
-* The Deploy Application job completed successfully
+* The DEFEND - Deploy Application job completed successfully
 * The Meridian Financial Portal on rhel02 is accessible
 * Splunk shows CVE events for both hosts
 
@@ -383,7 +383,7 @@ You should now see events for **both** `rhel01` and `app-server-2`.
 
 Everything is in place: EDA is running, rhel02 has the vulnerable app, and Splunk has detection events. Now run a scan to trigger the full detection-to-containment chain.
 
-. In AAP Controller, navigate to **Resources → Templates** and launch the **Scan System** job template. When prompted for a **Limit**, enter `app-server-2`.
+. In AAP Controller, navigate to **Resources → Templates** and launch the **DEFEND - Scan System** job template. When prompted for a **Limit**, enter `app-server-2`.
 +
 The scan will detect {target_cve} on rhel02 and report the finding to Splunk via HEC.
 
@@ -452,7 +452,7 @@ Both hosts should show identical containment posture — the difference is *how*
 
 ==== Verify
 
-* The Scan System job detected the CVE and reported it to Splunk
+* The DEFEND - Scan System job detected the CVE and reported it to Splunk
 * Splunk's saved search fired and the EDA add-on delivered the event
 * EDA matched the rule and triggered the Vulnerability Containment workflow against `app-server-2`
 * The Meridian Financial Portal on rhel02 is **no longer publicly accessible**
@@ -480,7 +480,7 @@ You've successfully completed the DEFEND module.
 * Splunk detects the threat, EDA routes the response, AAP executes the containment
 * The Splunk add-on sends the affected host from search results — the rulebook passes it as `job_args.limit` to scope the workflow
 * Containment != taking the service offline — it reduces attack surface while keeping internal access
-* Workflows chain multiple job templates into a coordinated response
+* Workflows chain multiple templates into a coordinated response
 
 **Next steps:**
 Module 2 will address what happens when Red Hat publishes an errata — you'll write a policy check playbook and build a patching workflow.

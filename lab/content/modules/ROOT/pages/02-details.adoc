@@ -81,6 +81,36 @@ Your lab consists of:
 * Podman 4.9+
 * Collections: `ansible.posix`, `redhat.rhel_system_roles`, `containers.podman`
 
+== Job Templates Quick Reference
+
+All job templates are prefixed with their module name so you can find them quickly in the AAP Templates list.
+
+[cols="1,3,4",options="header"]
+|===
+| Module | Template | What it does
+
+| DEFEND | DEFEND - Deploy Application | Deploy vulnerable httpd and Meridian Financial portal to a target host
+| DEFEND | DEFEND - Scan System | Check for CVE-2024-38476 on target, report to Splunk if found
+| DEFEND | DEFEND - Contain Service | Firewall restrictions, httpd hardening, security headers
+| DEFEND | DEFEND - Harden Posture | SELinux booleans and AIDE file integrity monitoring
+| CONTAIN | CONTAIN - Pre-Patch Check | Query OPA policy gates (backup, disk, service health) before patching
+| CONTAIN | CONTAIN - Patch System | Apply RHSA-2024:5138 security errata
+| CONTAIN | CONTAIN - Post-Patch Verify | Confirm CVE-2024-38476 is resolved after patching
+| CONTAIN | CONTAIN - Report Compliance | Generate patch compliance evidence report
+| COMPLY | COMPLY - Compliance Audit | Evaluate system against OPA compliance baselines (pre/post)
+| COMPLY | COMPLY - CIS Harden | Apply CIS benchmark-aligned hardening controls
+| COMPLY | COMPLY - Compliance Report | Generate HTML compliance report with before/after evidence
+| COMPLY | COMPLY - Build Container | Build hardened container image from UBI9-minimal
+| COMPLY | COMPLY - Scan Image | Scan container image for vulnerabilities
+| COMPLY | COMPLY - Push to Registry | Push verified container to local registry
+|===
+
+*Workflow templates:*
+
+* **Vulnerability Containment** — Scan → Contain → Harden (Module 1)
+* **Policy-Gated Patching** — Pre-Patch Check → Approval → Patch → Verify → Report (Module 2, built by attendees)
+* **Compliance and Hardening** — Audit → Harden → Re-Audit → Report → Build → Scan → Push (Module 3)
+
 == Pre-staged lab state
 
 The lab has been configured with:

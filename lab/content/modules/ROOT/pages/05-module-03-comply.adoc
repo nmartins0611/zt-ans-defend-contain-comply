@@ -56,7 +56,7 @@ OPA has loaded policy bundles that define auditable security baselines for the w
 
 Run the audit playbook to evaluate the system's current compliance posture.
 
-. In AAP Controller, navigate to **Job Templates** and launch "Compliance Audit":
+. In AAP Controller, navigate to **Resources → Templates** and launch "COMPLY - Compliance Audit":
 +
 Or from the terminal:
 +
@@ -99,7 +99,7 @@ print(f'Controls: {passed} passed, {failed} failed, {len(controls)} total')
 
 Run the hardening playbook that remediates failed compliance controls.
 
-. In AAP Controller, launch "CIS Harden":
+. In AAP Controller, launch "COMPLY - CIS Harden":
 +
 Or from the terminal:
 +
@@ -226,7 +226,7 @@ Key security properties:
 * Runs as `apache` user (non-root)
 * Labels include advisory and remediation metadata
 
-. In AAP Controller, launch "Build Hardened Container":
+. In AAP Controller, launch "COMPLY - Build Container":
 +
 Or from the terminal:
 +
@@ -249,7 +249,7 @@ sudo podman images | grep dcc
 
 == Exercise 6: Scan the Image and Push to Registry
 
-. In AAP Controller, launch "Scan Image":
+. In AAP Controller, launch "COMPLY - Scan Image":
 +
 Or from the terminal:
 +
@@ -287,13 +287,13 @@ Chain the full compliance and delivery process into a single AAP workflow.
 
 . Examine the workflow topology:
 +
-* **Compliance Audit (Pre)** — baseline evaluation
-* **CIS Harden** — apply remediation
-* **Compliance Audit (Post)** — verify remediation
-* **Compliance Report** — produce evidence
-* **Build Hardened Container** — containerize the application
-* **Scan Image** — verify the container
-* **Push to Registry** — publish to trusted registry
+* **COMPLY - Compliance Audit** (Pre) — baseline evaluation
+* **COMPLY - CIS Harden** — apply remediation
+* **COMPLY - Compliance Audit** (Post) — verify remediation
+* **COMPLY - Compliance Report** — produce evidence
+* **COMPLY - Build Container** — containerize the application
+* **COMPLY - Scan Image** — verify the container
+* **COMPLY - Push to Registry** — publish to trusted registry
 
 . Launch the workflow.
 

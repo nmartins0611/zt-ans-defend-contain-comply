@@ -154,19 +154,19 @@ Now construct the workflow that chains the policy check, approval, patching, and
 |===
 | Step | Node Type | Template
 
-| 1 | Job Template | Pre-Patch Check
+| 1 | Job Template | CONTAIN - Pre-Patch Check
 | 2 | Approval | Name: "Approve Patch Application", Timeout: 900s
-| 3 | Job Template | Patch System
-| 4 | Job Template | Post-Patch Verify
-| 5 | Job Template | Report Compliance
+| 3 | Job Template | CONTAIN - Patch System
+| 4 | Job Template | CONTAIN - Post-Patch Verify
+| 5 | Job Template | CONTAIN - Report Compliance
 |===
 
 . Connect the nodes with **On Success** links:
 +
-* Pre-Patch Check → *on success* → Approve Patch Application
-* Approve Patch Application → *on approve* → Patch System
-* Patch System → *on success* → Post-Patch Verify
-* Post-Patch Verify → *on success* → Report Compliance
+* CONTAIN - Pre-Patch Check → *on success* → Approve Patch Application
+* Approve Patch Application → *on approve* → CONTAIN - Patch System
+* CONTAIN - Patch System → *on success* → CONTAIN - Post-Patch Verify
+* CONTAIN - Post-Patch Verify → *on success* → CONTAIN - Report Compliance
 
 . Click **Save** in the Visualizer.
 
@@ -271,7 +271,7 @@ Demonstrate what happens when policy gates fail.
 sudo rm -f /var/log/last-backup-timestamp
 ----
 
-. In AAP Controller, launch just the "Pre-Patch Check" job template.
+. In AAP Controller, launch just the "CONTAIN - Pre-Patch Check" job template.
 
 . Observe the failure: OPA returns `allow_patch: false` and your playbook reports which gate was violated.
 
