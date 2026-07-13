@@ -5,15 +5,31 @@
 
   vars:
     target_service: httpd
+    firewall_service: http
     allowed_sources:
       - "10.0.0.0/8"
       - "172.16.0.0/12"
     containment_zone: internal-only
 
   tasks:
+    - name: Ensure firewalld and Python bindings are installed
+      ansible.builtin.dnf:
+        name:
+          - firewalld
+          - python3-firewall
+        state: present
+      become: true
+
+    - name: Ensure firewalld is running
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+      become: true
+
     - name: Restrict firewall access to internal networks only
       ansible.posix.firewalld:
-        rich_rule: "rule family=ipv4 source address={{ item }} service name={{ target_service }} accept"
+        rich_rule: "rule family=ipv4 source address={{ item }} service name={{ firewall_service }} accept"
         permanent: true
         immediate: true
         state: enabled
@@ -22,7 +38,7 @@
 
     - name: Remove public access to the service
       ansible.posix.firewalld:
-        service: "{{ target_service }}"
+        service: "{{ firewall_service }}"
         permanent: true
         immediate: true
         state: disabled
