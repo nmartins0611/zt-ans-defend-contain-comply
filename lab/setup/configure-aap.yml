@@ -76,16 +76,40 @@
           ansible_host: "{{ app_server_ip | default('rhel01') }}"
         state: present
 
+    - name: Add app-server-2 host
+      ansible.controller.host:
+        name: app-server-2
+        inventory: "{{ workshop_inventory_name }}"
+        variables:
+          ansible_host: "{{ app_server_2_ip | default('rhel02') }}"
+        state: present
+
     - name: Add app-server to appservers group
       ansible.controller.group:
         name: appservers
         inventory: "{{ workshop_inventory_name }}"
         hosts:
           - app-server
+          - app-server-2
         preserve_existing_hosts: true
         state: present
 
     # ── Job Templates (Module 1: DEFEND) ───────────────────────────────
+    - name: Create job template -- Deploy Application
+      ansible.controller.job_template:
+        name: "Deploy Application"
+        organization: "{{ workshop_org }}"
+        project: "{{ workshop_project_name }}"
+        playbook: "lab/playbooks/defend/deploy-application.yml"
+        inventory: "{{ workshop_inventory_name }}"
+        credential: "{{ workshop_credential_name }}"
+        execution_environment: "{{ workshop_ee_name }}"
+        ask_limit_on_launch: true
+        extra_vars:
+          target_cve: "{{ target_cve }}"
+          target_advisory: "{{ target_advisory }}"
+        state: present
+
     - name: Create job template -- Scan System
       ansible.controller.job_template:
         name: "Scan System"
@@ -252,6 +276,7 @@
         name: "Vulnerability Containment"
         organization: "{{ workshop_org }}"
         inventory: "{{ workshop_inventory_name }}"
+        ask_limit_on_launch: true
         state: present
 
     - name: Build Vulnerability Containment workflow nodes
@@ -460,6 +485,6 @@
             Project:    {{ workshop_project_name }}
             Inventory:  {{ workshop_inventory_name }}
             Credential: {{ workshop_credential_name }}
-            Job Templates:      13 (3 defend + 4 contain + 6 comply)
+            Job Templates:      14 (4 defend + 4 contain + 6 comply)
             Workflows:          3 (Vulnerability Containment, Policy-Gated Patching, Compliance and Hardening)
             Approval node:      Approve Patch Application (15 min timeout)
