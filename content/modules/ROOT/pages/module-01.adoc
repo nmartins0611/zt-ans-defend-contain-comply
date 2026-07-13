@@ -3,38 +3,46 @@ include::partial$_attributes.adoc[]
 
 == Objective
 
-Detect *{target_cve}* on the application server, contain the vulnerable `httpd` service, and harden the system posture -- all driven by Event-Driven Ansible responding to Splunk alerts.
+Investigate a critical CVE detected by Splunk, confirm it on the target system, contain it manually -- then configure Event-Driven Ansible to automate the same response on a second server. See the contrast between manual incident response and automated containment.
 
 == Scenario
 
-A Splunk saved search detects that `httpd` on `rhel01` is vulnerable to {target_cve} (Apache httpd SSRF, CVSS 9.8). No patch is available yet. Your immediate priority is to limit exposure while maintaining service availability.
+Splunk has detected that `httpd` on `rhel01` is vulnerable to {target_cve} (Apache httpd SSRF, CVSS 9.8). No patch is available yet. The Meridian Financial customer portal is publicly accessible. Your priority is to investigate, confirm, and contain the threat while maintaining internal availability.
 
 == Exercises
 
-=== Exercise 1.1: Scan the System
+=== Part 1: Manual Response (rhel01)
 
-Run the *Scan System* job template in AAP Controller. This playbook checks `yum updateinfo` for known CVEs affecting installed packages.
+==== Exercise 1.1: Investigate the CVE in Splunk
 
-Review the output -- you should see {target_cve} flagged against the installed `httpd` version.
+Confirm the Meridian Financial Portal on rhel01 is accessible. Open Splunk and run the saved search to see CVE detection events. Examine the alert details and the scheduled saved search.
 
-=== Exercise 1.2: Contain the Service
+==== Exercise 1.2: Confirm the Vulnerability from AAP
 
-Run the *Contain Service* job template. This restricts `httpd` to internal networks using firewalld zones and hardens SELinux booleans.
+Run the *Scan System* job template in AAP Controller (limited to `app-server`). Confirm {target_cve} is detected on `rhel01`.
 
-Verify that `httpd` is still running but only accessible from internal networks.
+==== Exercise 1.3: Manually Run the Containment Workflow
 
-=== Exercise 1.3: Harden the Posture
+Run the *Vulnerability Containment* workflow (limited to `app-server`). Verify the portal is no longer publicly accessible, firewall rules are applied, and SELinux booleans are enforced. The service is contained -- not offline.
 
-Run the *Harden Posture* job template. This deploys security headers, enables AIDE file integrity monitoring, and tightens system configuration.
+=== Part 2: Automated Response (rhel02)
 
-=== Exercise 1.4: Run the Workflow
+==== Exercise 1.4: Write the EDA Rulebook
 
-Run the *Vulnerability Containment* workflow template, which chains all three steps: Scan -> Contain -> Harden.
+Examine the Splunk webhook payload structure. Complete the EDA rulebook skeleton with three rules that map alert severity to AAP actions. Rule 1 uses `job_args.limit` to target the affected host.
 
-=== Exercise 1.5: Trigger via EDA
+==== Exercise 1.5: Configure EDA Controller
 
-Simulate a Splunk webhook alert to trigger the containment workflow automatically through Event-Driven Ansible.
+Set up EDA Controller: create an AAP token, EDA credential, project, and rulebook activation so EDA can receive webhooks and trigger AAP workflows.
+
+==== Exercise 1.6: Deploy the Application to rhel02
+
+Run the *Deploy Application* job template (limited to `app-server-2`). This deploys the vulnerable app to rhel02 and seeds Splunk with CVE detection events.
+
+==== Exercise 1.7: Trigger EDA and Watch Automated Containment
+
+Send the rhel02 alert payload to the EDA webhook. Watch EDA match the rule, trigger the Vulnerability Containment workflow on `app-server-2`, and verify the portal on rhel02 is no longer publicly accessible -- all without manual intervention.
 
 == Summary
 
-You have detected a critical CVE, contained the vulnerable service without taking it offline, and hardened the system posture. In the next module, you will apply the patch when it becomes available.
+You responded manually to a CVE on rhel01, then configured EDA to automate the same response on rhel02. What took minutes manually, EDA handled in seconds. Both servers are contained: public access removed, SELinux hardened, services still running for internal users. In the next module, you will apply the patch when it becomes available.

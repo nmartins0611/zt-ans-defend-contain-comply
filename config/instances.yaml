@@ -162,6 +162,20 @@ virtualmachines:
     networks:
       - default
       - secondary
+    services:
+      - name: app-http
+        ports:
+          - port: 80
+            protocol: TCP
+            targetPort: 80
+            name: app-http
+    routes:
+      - name: app
+        host: app
+        service: app-http
+        targetPort: 80
+        tls: true
+        tls_termination: Edge
     userdata: |-
       #cloud-config
       user: rhel
@@ -182,6 +196,20 @@ virtualmachines:
     networks:
       - default
       - secondary
+    services:
+      - name: app2-http
+        ports:
+          - port: 80
+            protocol: TCP
+            targetPort: 80
+            name: app2-http
+    routes:
+      - name: app2
+        host: app2
+        service: app2-http
+        targetPort: 80
+        tls: true
+        tls_termination: Edge
     userdata: |-
       #cloud-config
       user: rhel

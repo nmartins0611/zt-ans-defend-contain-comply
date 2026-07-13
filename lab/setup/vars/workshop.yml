@@ -31,6 +31,7 @@ eda_webhook_port: 5000
 
 # Host references
 app_server_host: rhel01
+app_server_2_host: rhel02
 central_host: central
 control_host: control
 

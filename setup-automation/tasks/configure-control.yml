@@ -68,7 +68,7 @@
   register: _aap_config
   changed_when: true
 
-- name: Configure EDA Controller
+- name: Configure EDA Controller (credential and project)
   ansible.builtin.command:
     cmd: >-
       ansible-playbook lab/setup/configure-eda.yml
@@ -82,4 +82,3 @@
   changed_when: true
   tags:
     - eda
-    - never

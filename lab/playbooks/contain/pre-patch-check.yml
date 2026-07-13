@@ -5,7 +5,7 @@
 
   vars:
     opa_url: "http://{{ opa_host | default('central') }}:{{ opa_port | default(8181) }}"
-    target_service: "{{ target_service | default('httpd') }}"
+    target_service: httpd
     backup_marker_path: /var/log/last-backup-timestamp
 
   tasks:

@@ -4,8 +4,8 @@
   gather_facts: true
 
   vars:
-    target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
-    target_service: "{{ target_service | default('httpd') }}"
+    target_advisory: "RHSA-2024:5138"
+    target_service: httpd
     snapshot_enabled: true
 
   tasks:

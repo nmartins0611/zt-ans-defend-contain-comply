@@ -10,7 +10,6 @@
   vars:
     splunk_api: "https://localhost:{{ splunk_port }}"
     splunk_auth: "{{ splunk_user }}:{{ splunk_password }}"
-    eda_webhook_url: "http://control:{{ eda_webhook_port }}/endpoint"
 
   tasks:
     - name: Wait for Splunk to be ready
@@ -26,69 +25,109 @@
       register: _splunk_ready
       until: _splunk_ready is succeeded
 
-    # ── Saved search for CVE detection ────────────────────────────────
-    - name: Check if DCC saved search exists
+    # ── Seed Splunk with CVE detection events ───────────────────────
+    - name: Wait for HEC to accept connections
       ansible.builtin.uri:
-        url: "{{ splunk_api }}/servicesNS/admin/search/saved/searches/DCC%20CVE%20Alert"
-        user: "{{ splunk_user }}"
-        password: "{{ splunk_password }}"
+        url: "https://localhost:8088/services/collector/health/1.0"
+        headers:
+          Authorization: "Splunk {{ splunk_hec_token }}"
         validate_certs: false
-        force_basic_auth: true
-        status_code: [200, 404]
-      register: _search_check
-
-    - name: Create DCC CVE saved search
-      ansible.builtin.uri:
-        url: "{{ splunk_api }}/servicesNS/admin/search/saved/searches"
-        method: POST
-        user: "{{ splunk_user }}"
-        password: "{{ splunk_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: form-urlencoded
-        body:
-          name: "DCC CVE Alert"
-          search: >-
-            index=main sourcetype=linux_secure
-            "CVE-2024-38476" OR "httpd" OR "vulnerability"
-            | stats count by host, source
-            | where count > 0
-          cron_schedule: "*/5 * * * *"
-          is_scheduled: "1"
-          dispatch.earliest_time: "-5m"
-          dispatch.latest_time: "now"
-          alert_type: "number of events"
-          alert_comparator: "greater than"
-          alert_threshold: "0"
-          alert.suppress: "1"
-          alert.suppress.period: "600s"
-          actions: "webhook"
-          action.webhook.param.url: "{{ eda_webhook_url }}"
-        status_code: [200, 201]
-      when: _search_check.status == 404
-      register: _search_created
-
-    - name: Update DCC CVE saved search
-      ansible.builtin.uri:
-        url: "{{ splunk_api }}/servicesNS/admin/search/saved/searches/DCC%20CVE%20Alert"
-        method: POST
-        user: "{{ splunk_user }}"
-        password: "{{ splunk_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: form-urlencoded
-        body:
-          search: >-
-            index=main sourcetype=linux_secure
-            "CVE-2024-38476" OR "httpd" OR "vulnerability"
-            | stats count by host, source
-            | where count > 0
-          actions: "webhook"
-          action.webhook.param.url: "{{ eda_webhook_url }}"
-          alert.suppress: "1"
-          alert.suppress.period: "600s"
         status_code: [200]
-      when: _search_check.status == 200
+      retries: 15
+      delay: 5
+      register: _hec_ready
+      until: _hec_ready is succeeded
+
+    - name: Seed CVE detection events into Splunk
+      ansible.builtin.uri:
+        url: "https://localhost:8088/services/collector/event"
+        method: POST
+        headers:
+          Authorization: "Splunk {{ splunk_hec_token }}"
+        validate_certs: false
+        body_format: json
+        body:
+          host: "rhel01"
+          source: "{{ item.source }}"
+          sourcetype: "linux_secure"
+          index: "main"
+          event: "{{ item.event }}"
+        status_code: [200]
+      loop:
+        - source: "/var/log/secure"
+          event: >-
+            vulnerability-scanner[2103]: CRITICAL: CVE-2024-38476 confirmed on httpd service (port 443).
+            Package httpd-2.4.57-5.el9 requires update to httpd-2.4.62-1.el9 per RHSA-2024:5138.
+            CVSS 9.8 - Apache HTTP Server SSRF via mod_rewrite. Immediate action required.
+        - source: "/var/log/secure"
+          event: >-
+            httpd[1842]: ModSecurity: Warning. Matched vulnerability signature for CVE-2024-38476.
+            Apache HTTP Server 2.4.57 affected by SSRF in mod_rewrite configurations
+            allowing unsafe RewriteRules [severity CRITICAL] [host rhel01]
+        - source: "/var/log/httpd/error_log"
+          event: >-
+            [security:alert] httpd vulnerability detected: CVE-2024-38476 affects httpd-2.4.57-5.el9.
+            Server-Side Request Forgery via mod_rewrite. Service exposed on 0.0.0.0:443.
+            Risk: unauthenticated remote attacker can forge requests to internal services.
+        - source: "/var/log/messages"
+          event: >-
+            audit[3201]: VULNERABILITY host=rhel01 pkg=httpd-2.4.57-5.el9 cve=CVE-2024-38476
+            cvss=9.8 advisory=RHSA-2024:5138 status=affected action=patch_required
+            detail="Apache HTTP Server SSRF in mod_rewrite"
+        - source: "/var/log/secure"
+          event: >-
+            vulnerability-scanner[2103]: SCAN SUMMARY for rhel01: 1 CRITICAL vulnerability found.
+            CVE-2024-38476 (httpd) - CVSS 9.8 - No patch applied.
+            Recommendation: Apply RHSA-2024:5138 or restrict network access immediately.
+      loop_control:
+        label: "{{ item.source }}"
+
+    # ── Saved search with EDA add-on alert action ─────────────────────
+    - name: Ensure savedsearches.conf directory exists
+      ansible.builtin.file:
+        path: "{{ splunk_data_dir }}/etc/users/admin/ansible_addon_for_splunk/local"
+        state: directory
+        mode: "0755"
+        owner: "41812"
+        group: "41812"
+
+    - name: Write DCC saved search to Splunk host volume
+      ansible.builtin.copy:
+        dest: "{{ splunk_data_dir }}/etc/users/admin/ansible_addon_for_splunk/local/savedsearches.conf"
+        owner: "41812"
+        group: "41812"
+        mode: "0644"
+        content: |
+          [DCC CVE Alert]
+          alert.severity = 4
+          alert.suppress = 1
+          alert.suppress.period = 600s
+          alert.track = 1
+          actions = ansible_core
+          action.ansible_core = 1
+          action.ansible_core.param.alert_type = webhook
+          action.ansible_core.param.environment = DCC
+          counttype = number of events
+          cron_schedule = */1 * * * *
+          dispatch.earliest_time = -5m
+          dispatch.latest_time = now
+          enableSched = 1
+          quantity = 0
+          relation = greater than
+          search = index=main sourcetype=linux_secure "CVE-2024-38476" OR "httpd" OR "vulnerability" | stats count by host, source | where count > 0
+
+    - name: Reload Splunk saved searches conf
+      ansible.builtin.uri:
+        url: "{{ splunk_api }}/servicesNS/admin/ansible_addon_for_splunk/saved/searches/_reload"
+        method: GET
+        user: "{{ splunk_user }}"
+        password: "{{ splunk_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200, 201, 204]
+      retries: 10
+      delay: 5
+      failed_when: false
 
     # ── Copy sample alert payload ─────────────────────────────────────
     - name: Ensure workshop files directory exists
@@ -107,6 +146,6 @@
       ansible.builtin.debug:
         msg: >-
           Splunk configured for DCC workshop:
-          saved search 'DCC CVE Alert' active,
-          webhook target {{ eda_webhook_url }},
-          10-minute alert suppression enabled.
+          saved search 'DCC CVE Alert' active (ansible_core action, DCC environment),
+          1-minute cron schedule, 10-minute alert suppression.
+          Students configure the DCC environment in the Splunk add-on UI.
