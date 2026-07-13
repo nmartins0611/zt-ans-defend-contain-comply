@@ -114,23 +114,77 @@ Now contain the threat by running the Vulnerability Containment workflow manuall
 
 . Click the **Portal - rhel01** tab and refresh the page. The portal should **no longer be accessible** — the containment workflow moved httpd to an internal-only firewall zone.
 
-. From the terminal, verify the containment:
+. Now open the terminal and verify what changed. Start with the **firewall containment** — check that `http` has been removed from the public zone:
 +
 [source,role="execute"]
 ----
 ssh rhel01 sudo firewall-cmd --zone=public --list-services
 ----
 +
-The `http` and `https` services should no longer appear in the public zone.
+The `http` and `https` services should no longer appear.
 
-. Verify SELinux booleans are enforced:
+. Inspect the `internal-only` zone — this is where access is now restricted to:
 +
 [source,role="execute"]
 ----
-ssh rhel01 getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail
+ssh rhel01 sudo firewall-cmd --zone=internal-only --list-all
 ----
 +
-All should show `off`.
+You should see rich rules allowing `http` only from `10.0.0.0/8` and `172.16.0.0/12`, and the network interface assigned to this zone.
+
+. Verify the **httpd hardening** — disabled modules:
++
+[source,role="execute"]
+----
+ssh rhel01 httpd -M 2>/dev/null | grep -E "cgi|autoindex|status" || echo "Modules disabled: cgi, autoindex, status"
+----
++
+None of the three modules should appear in the loaded module list.
+
+. Check that **server information exposure** is minimized:
++
+[source,role="execute"]
+----
+ssh rhel01 grep -E "^ServerTokens|^ServerSignature" /etc/httpd/conf/httpd.conf
+----
++
+Expected: `ServerTokens Prod` and `ServerSignature Off`.
+
+. Verify the **security headers** configuration was deployed:
++
+[source,role="execute"]
+----
+ssh rhel01 cat /etc/httpd/conf.d/security-containment.conf
+----
++
+You should see `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, and `Referrer-Policy` headers.
+
+. Test the headers are being served by making an internal request:
++
+[source,role="execute"]
+----
+ssh rhel01 curl -sI http://localhost | grep -iE "X-Content-Type|X-Frame|Content-Security|Referrer-Policy|Server:"
+----
++
+The security headers should appear in the response, and the `Server:` header should show only `Apache` (no version details, thanks to `ServerTokens Prod`).
+
+. Verify **SELinux booleans** are enforced (from the Harden Posture step):
++
+[source,role="execute"]
+----
+ssh rhel01 getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail httpd_use_nfs
+----
++
+All four should show `off`.
+
+. Confirm **AIDE file integrity monitoring** is active:
++
+[source,role="execute"]
+----
+ssh rhel01 sudo crontab -l | grep aide
+----
++
+You should see a cron entry running AIDE checks every 4 hours.
 
 . Confirm the service is still running (contained, not killed):
 +
@@ -139,12 +193,23 @@ All should show `off`.
 ssh rhel01 sudo systemctl status httpd --no-pager
 ----
 
+. Check the **containment log** for the audit trail:
++
+[source,role="execute"]
+----
+ssh rhel01 cat /var/log/containment-actions.log
+----
+
 ==== Verify
 
 * The Vulnerability Containment workflow completed successfully
 * The Meridian Financial Portal on rhel01 is **no longer publicly accessible**
-* Firewall restricts access to internal networks only
-* SELinux booleans prevent outbound connections and CGI
+* Firewall `internal-only` zone has rich rules restricting access to RFC 1918 ranges only
+* httpd modules `cgi`, `autoindex`, and `status` are disabled
+* `ServerTokens Prod` and `ServerSignature Off` minimize information exposure
+* Security headers (`X-Frame-Options`, `CSP`, etc.) are present in HTTP responses
+* SELinux booleans prevent outbound connections, CGI, mail, and NFS
+* AIDE file integrity monitoring is scheduled
 * httpd is still active — service is contained, not disrupted
 
 **That manual process took several minutes.** In Part 2, you will automate it.
@@ -308,12 +373,54 @@ curl -X POST http://eda-controller:5000/endpoint \
 
 The same result, but without any manual intervention on rhel02.
 
+. Verify containment on rhel02 from the terminal — confirm the firewall was locked down:
++
+[source,role="execute"]
+----
+ssh rhel02 sudo firewall-cmd --zone=internal-only --list-all
+----
++
+You should see the same rich rules and interface assignment as rhel01.
+
+. Verify hardening was applied identically:
++
+[source,role="execute"]
+----
+ssh rhel02 grep -E "^ServerTokens|^ServerSignature" /etc/httpd/conf/httpd.conf
+----
++
+[source,role="execute"]
+----
+ssh rhel02 getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail httpd_use_nfs
+----
+
+. Compare the containment state across both hosts side by side:
++
+[source,role="execute"]
+----
+for host in rhel01 rhel02; do
+  echo "=== $host ==="
+  echo "-- Firewall public zone --"
+  ssh $host sudo firewall-cmd --zone=public --list-services
+  echo "-- SELinux booleans --"
+  ssh $host getsebool httpd_can_network_connect httpd_enable_cgi
+  echo "-- Security headers --"
+  ssh $host curl -sI http://localhost | grep -i "X-Frame-Options"
+  echo "-- Containment log --"
+  ssh $host cat /var/log/containment-actions.log 2>/dev/null
+  echo ""
+done
+----
++
+Both hosts should show identical containment posture — the difference is *how* they got there.
+
 ==== Verify
 
 * EDA received the event and matched Rule 1
 * The Vulnerability Containment workflow ran against `app-server-2` only
 * The Meridian Financial Portal on rhel02 is **no longer publicly accessible**
-* Both servers are now contained
+* Both servers show identical containment: firewall, hardening, SELinux, and security headers
+* rhel01 was contained manually in minutes; rhel02 was contained automatically in seconds
 
 == Module summary
 
