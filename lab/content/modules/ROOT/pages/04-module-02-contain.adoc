@@ -141,38 +141,73 @@ Your playbook should:
 
 Now construct the workflow that chains the policy check, approval, patching, and reporting.
 
-. In AAP Controller, navigate to **Resources → Templates** and click **Add → Add workflow template**:
+. In AAP Controller, navigate to **Resources → Templates**.
+
+. Click the **Add** dropdown button (top right) and select **Add workflow template**.
+
+. Fill in the workflow template details:
 +
 * Name: `Policy-Gated Patching`
 * Organization: `Default`
 * Inventory: `DCC Workshop`
+* Leave all other settings at their defaults
 * Click **Save**
 
-. Open the **Visualizer** and add workflow nodes in this order:
+. After saving, you'll be taken to the workflow details page. Click the **Visualizer** tab to open the visual workflow editor.
+
+. You'll see an empty canvas with a **Start** node. Click the **Start** node to add the first step.
+
+. **Add Node 1 — Pre-Patch Check:**
 +
-[cols="1,2,2"]
-|===
-| Step | Node Type | Template
+* In the dialog that appears, select **Job Template** as the node type
+* Search for and select **CONTAIN - Pre-Patch Check**
+* Click **Save**
 
-| 1 | Job Template | CONTAIN - Pre-Patch Check
-| 2 | Approval | Name: "Approve Patch Application", Timeout: 900s
-| 3 | Job Template | CONTAIN - Patch System
-| 4 | Job Template | CONTAIN - Post-Patch Verify
-| 5 | Job Template | CONTAIN - Report Compliance
-|===
-
-. Connect the nodes with **On Success** links:
+. **Add Node 2 — Approval Gate:**
 +
-* CONTAIN - Pre-Patch Check → *on success* → Approve Patch Application
-* Approve Patch Application → *on approve* → CONTAIN - Patch System
-* CONTAIN - Patch System → *on success* → CONTAIN - Post-Patch Verify
-* CONTAIN - Post-Patch Verify → *on success* → CONTAIN - Report Compliance
+* Hover over the **CONTAIN - Pre-Patch Check** node and click the **+** icon that appears
+* Select **On Success** as the link type
+* Select **Approval** as the node type
+* Name: `Approve Patch Application`
+* Description: `Security team approval required before applying {target_advisory}`
+* Timeout: `900` seconds (15 minutes)
+* Click **Save**
 
-. Click **Save** in the Visualizer.
+. **Add Node 3 — Patch System:**
++
+* Hover over the **Approve Patch Application** node and click the **+** icon
+* Select **On Approve** as the link type
+* Select **Job Template** as the node type
+* Search for and select **CONTAIN - Patch System**
+* Click **Save**
+
+. **Add Node 4 — Post-Patch Verify:**
++
+* Hover over the **CONTAIN - Patch System** node and click the **+** icon
+* Select **On Success** as the link type
+* Select **Job Template** → **CONTAIN - Post-Patch Verify**
+* Click **Save**
+
+. **Add Node 5 — Report Compliance:**
++
+* Hover over the **CONTAIN - Post-Patch Verify** node and click the **+** icon
+* Select **On Success** as the link type
+* Select **Job Template** → **CONTAIN - Report Compliance**
+* Click **Save**
+
+. Review the completed workflow. The visualizer should show:
++
+----
+CONTAIN - Pre-Patch Check → Approve Patch Application → CONTAIN - Patch System → CONTAIN - Post-Patch Verify → CONTAIN - Report Compliance
+----
+
+. Click **Save** in the Visualizer to persist the workflow.
 
 === Verify
 
-The workflow visualizer should show five nodes connected in a linear chain with an approval gate between the policy check and the patch application.
+* The workflow visualizer shows five nodes connected in a linear chain
+* The approval gate sits between the policy check and the patch application
+* All links use **On Success** (or **On Approve** for the approval node)
 
 == Exercise 4: Execute the Patching Workflow
 
@@ -181,18 +216,37 @@ The workflow visualizer should show five nodes connected in a linear chain with 
 *Why we do this:* Running the workflow end-to-end proves the full chain works: policy evaluation, human approval, patch application, post-patch verification, and compliance reporting — all as a single auditable unit of work. The `set_stats` data flowing between nodes creates a machine-readable audit trail that compliance teams can query.
 ====
 
-. Launch the workflow by clicking **Launch**.
+. In AAP Controller, navigate to **Resources → Templates** and find the **Policy-Gated Patching** workflow you just created.
 
-. The workflow will pause at the Approval node. Click the **Approval** node and select **Approve**.
+. Click the rocket icon to **Launch** the workflow.
+
+. Watch the first node (**CONTAIN - Pre-Patch Check**) execute. It will:
 +
-This simulates the Change Advisory Board sign-off.
+* Gather system facts (backup age, disk space, service health)
+* Send the data to OPA for policy evaluation
+* Display PASS/FAIL for each gate
++
+If all gates pass, the workflow proceeds to the approval node.
+
+. The workflow will **pause** at the **Approve Patch Application** node. You'll see a notification banner in AAP.
++
+* Navigate to **Views → Jobs** if not already there
+* Click on the **Policy-Gated Patching** workflow job
+* You should see the approval node highlighted and waiting
+* Click on the **Approve Patch Application** node
+* Click **Approve** to authorize the patch
++
+This simulates the Change Advisory Board sign-off. In production, this would typically be a different person or team.
 
 . Watch the workflow proceed through the remaining nodes:
-* Patch System — installs `httpd-2.4.62-1.el9`
-* Post-Patch Verify — confirms CVE is resolved
-* Report Compliance — produces HTML artifact
++
+* **CONTAIN - Patch System** — installs `httpd-2.4.62-1.el9` from the errata repository
+* **CONTAIN - Post-Patch Verify** — confirms {target_cve} is resolved by checking `yum updateinfo`
+* **CONTAIN - Report Compliance** — generates an HTML compliance report with patch evidence
 
-. Once complete, verify from the terminal:
+. Wait for all nodes to complete with green checkmarks.
+
+. Verify from the terminal that the patch was applied:
 +
 [source,role="execute"]
 ----
@@ -208,11 +262,19 @@ Expected: `httpd-2.4.62-1.el9` (or newer).
 yum updateinfo list cves 2>/dev/null | grep CVE-2024-38476 || echo "CVE-2024-38476: RESOLVED"
 ----
 
+. Check that httpd is still running with the patched version:
++
+[source,role="execute"]
+----
+sudo systemctl status httpd --no-pager | head -5
+----
+
 === Verify
 
-* `httpd` is upgraded to the patched version
-* CVE-2024-38476 no longer appears in pending advisories
-* Workflow completed all nodes successfully
+* The workflow completed all five nodes successfully (all green checkmarks)
+* `httpd` is upgraded to the patched version (`httpd-2.4.62-1.el9` or newer)
+* {target_cve} no longer appears in pending advisories
+* The approval gate paused the workflow until you explicitly approved
 
 == Exercise 5: Review the Compliance Report
 
@@ -229,31 +291,44 @@ The final workflow node generated an HTML compliance report.
 ----
 ls -la /tmp/compliance-reports/
 ----
++
+You should see the report file with today's date.
 
-. View the report content:
+. View the report content — check for the advisory and remediation evidence:
 +
 [source,role="execute"]
 ----
 cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -A2 "Advisory Applied"
 ----
 
-. In AAP Controller, check the workflow job → **Extra Vars / Artifacts** panel:
+. Check the package version recorded in the report:
 +
-The `set_stats` data from each job shows the complete audit trail:
-* `pre_patch_policy_passed: true`
-* `patch_applied: true`
-* `cve_resolved: true`
-* `selinux_enforcing: true`
+[source,role="execute"]
+----
+cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "httpd|CVE|RHSA|SELinux" | head -10
+----
+
+. In AAP Controller, go back to **Views → Jobs** and click on the completed **Policy-Gated Patching** workflow job.
++
+Look at the **Extra Vars / Artifacts** panel (or click individual nodes to see their output). The `set_stats` data from each job shows the complete audit trail:
++
+* `pre_patch_policy_passed: true` — all OPA gates passed
+* `patch_applied: true` — the errata was installed
+* `cve_resolved: true` — post-patch verification confirmed
+* `selinux_enforcing: true` — security posture maintained
++
+This data is machine-readable and flows between workflow nodes — compliance teams can query it programmatically.
 
 === Verify
 
 The compliance report contains:
 
 * CVE identifier and advisory number
-* Package version before and after
+* Package version before and after patching
 * SELinux status
 * Firewall configuration
 * Complete remediation timestamp
+* The `set_stats` artifacts provide a machine-readable audit trail
 
 == Exercise 6: Test Policy Violation (Optional)
 
@@ -264,27 +339,52 @@ The compliance report contains:
 
 Demonstrate what happens when policy gates fail.
 
-. Remove the backup marker to simulate a stale backup:
+. First, verify the backup marker currently exists:
++
+[source,role="execute"]
+----
+ls -la /var/log/last-backup-timestamp
+----
+
+. Remove the backup marker to simulate a stale or missing backup:
 +
 [source,role="execute"]
 ----
 sudo rm -f /var/log/last-backup-timestamp
 ----
 
-. In AAP Controller, launch just the "CONTAIN - Pre-Patch Check" job template.
+. In AAP Controller, navigate to **Resources → Templates** and launch just the **CONTAIN - Pre-Patch Check** job template (not the workflow — we want to see the policy check in isolation).
 
-. Observe the failure: OPA returns `allow_patch: false` and your playbook reports which gate was violated.
+. Watch the job output carefully. The playbook will:
++
+* Attempt to check the backup marker file — it won't exist
+* Report backup age as exceeding the allowed threshold
+* Send the data to OPA
+* OPA will return `allow_patch: false`
+* The playbook will fail with a clear message identifying which gate was violated
++
+This is the policy working as designed — it prevents patching a system that hasn't been recently backed up.
 
-. Restore the marker for subsequent exercises:
+. Now restore the marker so subsequent exercises work correctly:
 +
 [source,role="execute"]
 ----
 sudo touch /var/log/last-backup-timestamp
 ----
 
+. Optionally, re-run the pre-patch check to confirm it passes again:
++
+[source,role="execute"]
+----
+cd /var/lib/awx/projects/defend-contain-comply/lab
+ansible-playbook playbooks/contain/pre-patch-check.yml -i inventory/workshop.yml
+----
+
 === Verify
 
-The pre-patch check fails with a clear message identifying the violated policy gate.
+* The pre-patch check fails with a clear message identifying the violated policy gate (backup)
+* After restoring the marker, the check passes again
+* The policy gate prevented an unsafe action — this is the safety net in action
 
 == Module summary
 
