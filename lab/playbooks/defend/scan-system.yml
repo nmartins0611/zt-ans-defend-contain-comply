@@ -59,6 +59,36 @@
         mode: "0644"
       when: cve_detected | bool
 
+    - name: Get installed httpd version for Splunk reporting
+      ansible.builtin.command:
+        cmd: rpm -q httpd --queryformat '%{VERSION}-%{RELEASE}'
+      register: _installed_httpd
+      changed_when: false
+      failed_when: false
+      when: cve_detected | bool
+
+    - name: Report CVE detection to Splunk via HEC
+      ansible.builtin.uri:
+        url: "{{ splunk_hec_url | default('http://central:8088/services/collector/event') }}"
+        method: POST
+        headers:
+          Authorization: "Splunk {{ splunk_hec_token | default('a1b2c3d4-e5f6-7890-abcd-ef1234567890') }}"
+        validate_certs: false
+        body_format: json
+        body:
+          host: "{{ inventory_hostname }}"
+          source: "/var/log/secure"
+          sourcetype: "linux_secure"
+          index: "main"
+          event: >-
+            vulnerability-scanner[{{ ansible_date_time.epoch }}]: CRITICAL: {{ target_cve }} confirmed
+            on httpd service. Package httpd-{{ _installed_httpd.stdout | default('unknown') }}
+            requires update. CVSS 9.8 - Apache HTTP Server SSRF via mod_rewrite.
+            Immediate action required. Host: {{ inventory_hostname }}
+        status_code: [200]
+      when: cve_detected | bool
+      failed_when: false
+
     - name: Set scan result fact for downstream workflows
       ansible.builtin.set_stats:
         data:

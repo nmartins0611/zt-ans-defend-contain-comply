@@ -24,6 +24,11 @@ By the end of this module, you'll be able to:
 
 == Exercise 1: Examine the Patch Policy
 
+[NOTE.why]
+====
+*Why we do this:* In regulated environments, you can't just apply patches whenever you want. Change management policies exist because rushed patches cause outages. OPA (Open Policy Agent) codifies these policies so they can be evaluated automatically: Is there a recent backup? Are we in a maintenance window? Is there enough disk space? Is the service healthy? Policy-as-code means the rules are version-controlled, auditable, and consistently enforced — no more "I thought it was OK to patch during business hours."
+====
+
 Before writing the playbook, understand the policies that govern patching at Meridian Financial.
 
 . From the terminal, review the patch policy definition:
@@ -61,6 +66,11 @@ for p in data.get('result', []):
 The patch policy defines clear, automatable prerequisites. The backup marker exists and OPA has the `dcc/patch_policy` rules loaded.
 
 == Exercise 2: Write the Pre-Patch Policy Check Playbook
+
+[NOTE.why]
+====
+*Why we do this:* Ansible gathers the facts, OPA makes the decision. The playbook collects real system state — backup age, disk space, service health — and sends it to OPA for evaluation against the organization's patch policy. If any gate fails, patching is blocked with a clear reason. This separation of concerns means security teams own the policy (in OPA), platform teams own the automation (in Ansible), and neither can override the other without a visible audit trail.
+====
 
 You will write a playbook that gathers system facts, sends them to OPA for evaluation, and blocks patching if any policy gates fail. A skeleton file with detailed instructions has been provided.
 
@@ -124,6 +134,11 @@ Your playbook should:
 
 == Exercise 3: Build the Patching Workflow in AAP Controller
 
+[NOTE.why]
+====
+*Why we do this:* The workflow enforces a sequence that can't be shortcut: policy check → human approval → patch → verify → report. The approval node is the Change Advisory Board in code — it pauses the workflow until an authorized person explicitly approves. Automation handles the tedious parts (gathering evidence, applying patches, running verification) while humans stay in the loop for the decision that carries risk. If the policy check fails, the workflow never reaches the approval node.
+====
+
 Now construct the workflow that chains the policy check, approval, patching, and reporting.
 
 . In AAP Controller, navigate to **Resources → Templates** and click **Add → Add workflow template**:
@@ -161,6 +176,11 @@ The workflow visualizer should show five nodes connected in a linear chain with 
 
 == Exercise 4: Execute the Patching Workflow
 
+[NOTE.why]
+====
+*Why we do this:* Running the workflow end-to-end proves the full chain works: policy evaluation, human approval, patch application, post-patch verification, and compliance reporting — all as a single auditable unit of work. The `set_stats` data flowing between nodes creates a machine-readable audit trail that compliance teams can query.
+====
+
 . Launch the workflow by clicking **Launch**.
 
 . The workflow will pause at the Approval node. Click the **Approval** node and select **Approve**.
@@ -195,6 +215,11 @@ yum updateinfo list cves 2>/dev/null | grep CVE-2024-38476 || echo "CVE-2024-384
 * Workflow completed all nodes successfully
 
 == Exercise 5: Review the Compliance Report
+
+[NOTE.why]
+====
+*Why we do this:* Auditors don't accept "we ran the playbook" as evidence. They need timestamped proof of what was done, what changed, and what the system state is now. Generating the compliance report as a workflow step means evidence collection is automatic and contemporaneous — it captures the exact state at the moment of remediation, not a reconstruction days later. This is the difference between "we think we patched it" and "here's the proof."
+====
 
 The final workflow node generated an HTML compliance report.
 
@@ -231,6 +256,11 @@ The compliance report contains:
 * Complete remediation timestamp
 
 == Exercise 6: Test Policy Violation (Optional)
+
+[NOTE.why]
+====
+*Why we do this:* A policy gate is only valuable if it actually blocks. Removing the backup marker simulates a real scenario — someone tries to patch a system that hasn't been backed up recently. The pre-patch check fails with a specific, actionable message. This demonstrates that the automation is safe by default: it won't take a risky action just because someone clicked "run."
+====
 
 Demonstrate what happens when policy gates fail.
 

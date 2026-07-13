@@ -10,7 +10,6 @@
   vars:
     splunk_api: "https://localhost:{{ splunk_port }}"
     splunk_auth: "{{ splunk_user }}:{{ splunk_password }}"
-    eda_webhook_url: "http://control:{{ eda_webhook_port }}/endpoint"
 
   tasks:
     - name: Wait for Splunk to be ready
@@ -83,69 +82,52 @@
       loop_control:
         label: "{{ item.source }}"
 
-    # ── Saved search for CVE detection ────────────────────────────────
-    - name: Check if DCC saved search exists
-      ansible.builtin.uri:
-        url: "{{ splunk_api }}/servicesNS/admin/search/saved/searches/DCC%20CVE%20Alert"
-        user: "{{ splunk_user }}"
-        password: "{{ splunk_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        status_code: [200, 404]
-      register: _search_check
+    # ── Saved search with EDA add-on alert action ─────────────────────
+    - name: Ensure savedsearches.conf directory exists
+      ansible.builtin.file:
+        path: "{{ splunk_data_dir }}/etc/users/admin/ansible_addon_for_splunk/local"
+        state: directory
+        mode: "0755"
+        owner: "41812"
+        group: "41812"
 
-    - name: Create DCC CVE saved search
-      ansible.builtin.uri:
-        url: "{{ splunk_api }}/servicesNS/admin/search/saved/searches"
-        method: POST
-        user: "{{ splunk_user }}"
-        password: "{{ splunk_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: form-urlencoded
-        body:
-          name: "DCC CVE Alert"
-          search: >-
-            index=main sourcetype=linux_secure
-            "CVE-2024-38476" OR "httpd" OR "vulnerability"
-            | stats count by host, source
-            | where count > 0
-          cron_schedule: "*/5 * * * *"
-          is_scheduled: "1"
-          dispatch.earliest_time: "-5m"
-          dispatch.latest_time: "now"
-          alert_type: "number of events"
-          alert_comparator: "greater than"
-          alert_threshold: "0"
-          alert.suppress: "1"
-          alert.suppress.period: "600s"
-          actions: "webhook"
-          action.webhook.param.url: "{{ eda_webhook_url }}"
-        status_code: [200, 201]
-      when: _search_check.status == 404
-      register: _search_created
+    - name: Write DCC saved search to Splunk host volume
+      ansible.builtin.copy:
+        dest: "{{ splunk_data_dir }}/etc/users/admin/ansible_addon_for_splunk/local/savedsearches.conf"
+        owner: "41812"
+        group: "41812"
+        mode: "0644"
+        content: |
+          [DCC CVE Alert]
+          alert.severity = 4
+          alert.suppress = 1
+          alert.suppress.period = 600s
+          alert.track = 1
+          actions = ansible_core
+          action.ansible_core = 1
+          action.ansible_core.param.alert_type = webhook
+          action.ansible_core.param.environment = DCC
+          counttype = number of events
+          cron_schedule = */1 * * * *
+          dispatch.earliest_time = -5m
+          dispatch.latest_time = now
+          enableSched = 1
+          quantity = 0
+          relation = greater than
+          search = index=main sourcetype=linux_secure "CVE-2024-38476" OR "httpd" OR "vulnerability" | stats count by host, source | where count > 0
 
-    - name: Update DCC CVE saved search
+    - name: Reload Splunk saved searches conf
       ansible.builtin.uri:
-        url: "{{ splunk_api }}/servicesNS/admin/search/saved/searches/DCC%20CVE%20Alert"
-        method: POST
+        url: "{{ splunk_api }}/servicesNS/admin/ansible_addon_for_splunk/saved/searches/_reload"
+        method: GET
         user: "{{ splunk_user }}"
         password: "{{ splunk_password }}"
         validate_certs: false
         force_basic_auth: true
-        body_format: form-urlencoded
-        body:
-          search: >-
-            index=main sourcetype=linux_secure
-            "CVE-2024-38476" OR "httpd" OR "vulnerability"
-            | stats count by host, source
-            | where count > 0
-          actions: "webhook"
-          action.webhook.param.url: "{{ eda_webhook_url }}"
-          alert.suppress: "1"
-          alert.suppress.period: "600s"
-        status_code: [200]
-      when: _search_check.status == 200
+        status_code: [200, 201, 204]
+      retries: 10
+      delay: 5
+      failed_when: false
 
     # ── Copy sample alert payload ─────────────────────────────────────
     - name: Ensure workshop files directory exists
@@ -164,6 +146,6 @@
       ansible.builtin.debug:
         msg: >-
           Splunk configured for DCC workshop:
-          saved search 'DCC CVE Alert' active,
-          webhook target {{ eda_webhook_url }},
-          10-minute alert suppression enabled.
+          saved search 'DCC CVE Alert' active (ansible_core action, DCC environment),
+          1-minute cron schedule, 10-minute alert suppression.
+          Students configure the DCC environment in the Splunk add-on UI.

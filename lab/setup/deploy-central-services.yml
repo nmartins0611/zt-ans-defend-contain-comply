@@ -135,6 +135,53 @@
         enabled: true
       when: _opa_systemd is changed
 
+    # ── Splunk EDA Add-on ────────────────────────────────────────────────
+    - name: Create temporary directory for Splunk apps
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: splunk_apps
+      register: _temp_apps_dir
+
+    - name: Download Red Hat EDA Add-on for Splunk
+      ansible.builtin.get_url:
+        url: "https://my-splunk-apps.s3.us-east-1.amazonaws.com/apps/red-hat-event-driven-ansible-add-on-for-splunk_101.tgz"
+        dest: "{{ _temp_apps_dir.path }}/red-hat-event-driven-ansible-add-on-for-splunk_101.tgz"
+        mode: "0644"
+      register: _eda_addon_download
+      retries: 3
+      delay: 10
+      until: _eda_addon_download is succeeded
+
+    - name: Copy EDA add-on into Splunk container
+      containers.podman.podman_container_copy:
+        container: "{{ splunk_container_name }}"
+        src: "{{ _temp_apps_dir.path }}/red-hat-event-driven-ansible-add-on-for-splunk_101.tgz"
+        dest: "/tmp/red-hat-event-driven-ansible-add-on-for-splunk_101.tgz"
+
+    - name: Extract EDA add-on inside Splunk container
+      containers.podman.podman_container_exec:
+        name: "{{ splunk_container_name }}"
+        command: "tar -xzf /tmp/red-hat-event-driven-ansible-add-on-for-splunk_101.tgz -C /opt/splunk/etc/apps"
+        user: root
+
+    - name: Clean up add-on tarball from container
+      containers.podman.podman_container_exec:
+        name: "{{ splunk_container_name }}"
+        command: "rm -f /tmp/red-hat-event-driven-ansible-add-on-for-splunk_101.tgz"
+        user: root
+      failed_when: false
+
+    - name: Clean up temporary directory
+      ansible.builtin.file:
+        path: "{{ _temp_apps_dir.path }}"
+        state: absent
+
+    - name: Restart Splunk container to load EDA add-on
+      containers.podman.podman_container:
+        name: "{{ splunk_container_name }}"
+        state: started
+        force_restart: true
+
     # ── Health Checks ──────────────────────────────────────────────────
     - name: Wait for Splunk to be healthy
       ansible.builtin.uri:

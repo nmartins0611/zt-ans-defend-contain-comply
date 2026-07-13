@@ -18,13 +18,19 @@ By the end of this module, you'll be able to:
 * Investigate a CVE alert in Splunk and understand the detection data
 * Run a vulnerability scan from AAP to confirm the CVE on the target system
 * Manually execute a containment workflow and verify the results
-* Write an EDA rulebook that maps alert severity to automated actions
-* Configure Event-Driven Ansible to receive external webhook alerts
+* Write an EDA rulebook that matches Splunk saved search alerts
+* Connect Splunk to EDA using the Ansible Add-on for Splunk
+* Create a Token Event Stream and Rulebook Activation in EDA Controller
 * Deploy a vulnerable application and watch EDA automatically contain it
 
 == Part 1: Manual Response (rhel01)
 
 === Exercise 1: Investigate the CVE in Splunk
+
+[NOTE.why]
+====
+*Why we do this:* Before automating any response, security teams need to understand what they're dealing with. Splunk aggregates detection data from multiple sources — vulnerability scanners, log analysis, intrusion detection — into a single correlated view. Investigating the alert manually first establishes the baseline: what CVE, what severity, which hosts, which packages. This is the context that drives every decision downstream.
+====
 
 Your security team has flagged unusual activity. Start by investigating what Splunk has detected.
 
@@ -73,6 +79,11 @@ This groups the findings by host and log source — this is the query that power
 
 === Exercise 2: Confirm the Vulnerability from AAP
 
+[NOTE.why]
+====
+*Why we do this:* SIEM alerts can be noisy — false positives, stale data, correlation errors. Before taking action, you need ground truth from the target system itself. The Scan System playbook uses `yum updateinfo` to check the RPM advisory database directly on the host, confirming the CVE actually applies to the installed package version. This separation of detection (Splunk) and confirmation (Ansible) prevents unnecessary containment actions.
+====
+
 Splunk shows the detection, but you need to confirm the CVE actually exists on the target system.
 
 . Open the **AAP Controller** tab and log in:
@@ -97,6 +108,11 @@ The CVE is confirmed. The vulnerable `httpd-2.4.57-5.el9` package is installed o
 * Job output confirms {target_cve} is detected on `rhel01`
 
 === Exercise 3: Manually Run the Containment Workflow
+
+[NOTE.why]
+====
+*Why we do this:* The workflow chains three distinct security responses that work together. *Scan* confirms the vulnerability is real before taking action. *Contain* restricts network access without killing the service — the firewall moves the interface to an internal-only zone with RFC 1918 source restrictions, reducing the attack surface from "anyone on the internet" to "only internal networks." httpd keeps running because an abrupt shutdown could disrupt legitimate internal users and trigger cascading failures. *Harden* applies defense-in-depth — SELinux booleans block outbound connections (preventing SSRF exploitation even from allowed sources), and AIDE establishes a file integrity baseline so any tampering is detected. Running this manually first makes the time cost visible — every minute between detection and containment is a window an attacker can exploit.
+====
 
 Now contain the threat by running the Vulnerability Containment workflow manually.
 
@@ -216,25 +232,21 @@ ssh rhel01 cat /var/log/containment-actions.log
 
 == Part 2: Automated Response (rhel02)
 
-=== Exercise 4: Examine the Alert Payload and Write the EDA Rulebook
+=== Exercise 4: Write the EDA Rulebook
 
-Before configuring EDA, understand the data that Splunk sends and write the rules to respond.
+[NOTE.why]
+====
+*Why we do this:* Event-Driven Ansible needs rules that map incoming alert data to the right automated response. The rulebook is the decision logic: which alerts warrant full containment, which need investigation only, and which trigger patching. Writing these rules forces you to think about your organization's response policy in code — what severity triggers what action, and what data from the alert flows through to the automation.
+====
 
-. Examine the sample alert payload:
+When the Splunk saved search detects CVE events, the **Ansible Add-on for Splunk** sends a webhook to EDA. You need a rulebook that matches these events and triggers the right workflow.
+
+. First, understand the payload that Splunk's add-on sends to EDA. The key fields are:
 +
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/templates/splunk-alert-payload.json | python3 -m json.tool
-----
-+
-Note the key fields for your rulebook conditions:
-
-* `source` — `"splunk"`
-* `severity` — `"critical"`, `"high"`, etc.
-* `cve_id` — `"{target_cve}"`
-* `host` — the affected host (used to limit the workflow to the right target)
-* `patch_available` — `true` / `false`
-* `advisory_id` — present when a patch is available
+* `event.payload.search_name` — the saved search name (e.g. `"DCC CVE Alert"`)
+* `event.payload.result.host` — the affected host from search results
+* `event.payload.result.count` — number of matches
+* `event.payload.app` — `"ansible_addon_for_splunk"`
 
 . Open the exercise skeleton:
 +
@@ -243,7 +255,7 @@ Note the key fields for your rulebook conditions:
 cat /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/splunk-cve-alert-exercise.yml
 ----
 
-. Copy it and complete the three rules:
+. Copy it and complete the rule:
 +
 [source,role="execute"]
 ----
@@ -258,11 +270,9 @@ vi /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/my-splunk-cve-alert
 +
 [TIP]
 ====
-*Rule 1* (Critical CVE — no patch): Match `event.payload.severity == "critical"` and `event.payload.source == "splunk"` and `event.payload.cve_id is defined`. Use `run_workflow_template` to trigger "Vulnerability Containment" with `job_args.limit` set to `event.payload.host`.
+The Splunk add-on sends the saved search name in `event.payload.search_name`. Use the `is search()` operator for substring matching — this is more resilient than exact string comparison.
 
-*Rule 2* (High CVE): Match `event.payload.severity == "high"`. Use `run_job_template` to trigger "Scan System".
-
-*Rule 3* (Patch available): Match `event.payload.patch_available == true` and `event.payload.advisory_id is defined`. Use `run_workflow_template` to trigger "Policy-Gated Patching".
+*Rule 1* (CVE alert from Splunk): Match `event.payload.search_name is search("CVE Alert")`. Use `run_workflow_template` to trigger "Vulnerability Containment" with `job_args.limit` set to `event.payload.result.host`.
 ====
 
 . If you get stuck, the solution is available:
@@ -281,54 +291,71 @@ python3 -c "import yaml; yaml.safe_load(open('/var/lib/awx/projects/defend-conta
 
 ==== Verify
 
-Your rulebook has three rules with the correct conditions and actions.
+Your rulebook has a rule that matches on the Splunk saved search name and triggers the containment workflow scoped to the affected host.
 
-=== Exercise 5: Configure EDA Controller
+=== Exercise 5: Connect Splunk to EDA Controller
 
-. Open the **EDA Controller** tab.
+[NOTE.why]
+====
+*Why we do this:* The EDA Token Event Stream is the secure ingestion point for external systems. By creating the event stream in AAP and configuring the Splunk add-on to point at it, you're building a trusted channel between your SIEM and your automation platform. The API key authentication ensures only authorized sources can trigger automation. This is the wiring that turns a detection tool into a response system.
+====
 
-. Create an **AAP Controller Token** for EDA:
-.. In *AAP Controller*, navigate to **Access → Users → admin → Tokens**
-.. Click **Create Token**, set scope to **Write**, and click **Save**
-.. Copy the token value
+The EDA credential, project, and decision environment are already configured. You need to create a **Token Event Stream** in EDA, configure the **Splunk add-on** to point at it, and create the **Rulebook Activation**.
 
-. Create an **EDA Credential**:
-.. In EDA Controller, navigate to **Credentials** and click **Create Credential**
-.. Name: `DCC Controller Token`
-.. Credential Type: `Red Hat Ansible Automation Platform`
-.. Controller URL: `https://control`
-.. OAuth Token: paste the token from the previous step
-.. SSL Verify: `No`
+. Open the **EDA Controller** tab and navigate to **Event Streams**.
 
-. Create an **EDA Project**:
-.. Navigate to **Projects** and click **Create Project**
-.. Name: `Defend, Contain, Comply`
-.. SCM URL: `http://gitea:3000/gitea/defend-contain-comply.git`
-.. SCM Branch: `dev`
-.. Wait for the project sync to complete (status: Completed)
+. Click **Create event stream**:
++
+* Name: `DCC Splunk Events`
+* Credential Type: `Token`
+* Click **Create event stream**
 
-. Create a **Rulebook Activation**:
-.. Navigate to **Rulebook Activations** and click **Create Rulebook Activation**
-.. Name: `DCC CVE Alert Responder`
-.. Project: `Defend, Contain, Comply`
-.. Rulebook: select `lab/rulebooks/my-splunk-cve-alert.yml` (or `splunk-cve-alert.yml` if using the solution)
-.. Decision Environment: select the default
-.. Credential: `DCC Controller Token`
-.. Click **Create Rulebook Activation**
+. Copy the **Event Stream URL** and **Token** that are displayed — you will need these for the Splunk configuration.
+
+. Open the **Splunk** tab and navigate to **Apps → Ansible Add-on for Splunk → Configuration**.
+
+. Click **Create New Environment**:
++
+* Environment Name: `DCC`
+* Integration Type: `Webhook`
+* Webhook Endpoint: paste the Event Stream URL from step 3
+* Auth Type: `API Key`
+* Token: paste the Token from step 3
+* SSL Check Hostname: `No` (lab environment uses self-signed certificates)
+* Click **Save**
+
+. Back in **EDA Controller**, navigate to **Rulebook Activations** and click **Create rulebook activation**:
++
+* Name: `DCC CVE Alert Responder`
+* Project: `Defend, Contain, Comply` (pre-configured)
+* Rulebook: select `lab/rulebooks/my-splunk-cve-alert.yml` (or `splunk-cve-alert.yml` if using the solution)
+* Decision Environment: select the default (pre-configured)
+* Credential: `DCC Controller Token` (pre-configured)
+* Event stream: `DCC Splunk Events`
+* Click **Create rulebook activation**
+
+. Wait for the activation status to show **Running**.
 
 ==== Verify
 
-The rulebook activation status should show **Running** and listening on port 5000.
+* The Token Event Stream `DCC Splunk Events` exists in EDA Controller
+* The Splunk add-on has a `DCC` environment configured with the correct event stream URL
+* The rulebook activation is **Running**
 
 === Exercise 6: Deploy the Application to rhel02
 
-Now deploy the same vulnerable application to a second server. This will also seed Splunk with CVE detection events for rhel02.
+[NOTE.why]
+====
+*Why we do this:* This simulates a common real-world scenario: the same vulnerable software gets deployed to a second server — a scale-out, a DR replica, or a developer spinning up a new instance from the same golden image. The Scan System job detects the CVE and reports it to Splunk, seeding the SIEM with detection events for this new host. This is the trigger data that will flow through to EDA.
+====
+
+Now deploy the same vulnerable application to a second server.
 
 . In AAP Controller, navigate to **Resources → Templates** and find the **Deploy Application** job template.
 
 . Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `app-server-2` to target only rhel02.
 
-. Wait for the job to complete. It deploys the vulnerable httpd, the Meridian Financial portal, configures the errata repository, and sends CVE detection events to Splunk.
+. Wait for the job to complete. It deploys the vulnerable httpd, the Meridian Financial portal, and configures the errata repository.
 
 . Click the **Portal - rhel02** tab and confirm the portal is now up and accessible.
 
@@ -349,18 +376,27 @@ You should now see events for **both** `rhel01` and `app-server-2`.
 
 === Exercise 7: Trigger EDA and Watch Automated Containment
 
-Everything is in place: EDA is running, rhel02 has the vulnerable app, and Splunk has detection events. Now trigger the alert for rhel02 and watch the automated response.
+[NOTE.why]
+====
+*Why we do this:* This is the payoff. The same containment that took you several minutes manually in Exercise 3 now happens in seconds, with zero human intervention. The chain is: Scan System detects the CVE and reports to Splunk → Splunk saved search fires on the next cron cycle → the EDA add-on sends the alert to the Token Event Stream → EDA matches the rulebook condition → triggers the Vulnerability Containment workflow scoped to the affected host only.
+====
 
-. Send the rhel02-specific alert payload to the EDA webhook endpoint:
+Everything is in place: EDA is running, rhel02 has the vulnerable app, and Splunk has detection events. Now run a scan to trigger the full detection-to-containment chain.
+
+. In AAP Controller, navigate to **Resources → Templates** and launch the **Scan System** job template. When prompted for a **Limit**, enter `app-server-2`.
 +
-[source,role="execute"]
-----
-curl -X POST http://eda-controller:5000/endpoint \
-  -H "Content-Type: application/json" \
-  -d @/var/lib/awx/projects/defend-contain-comply/lab/templates/splunk-alert-payload-rhel02.json
-----
+The scan will detect {target_cve} on rhel02 and report the finding to Splunk via HEC.
 
-. Switch to the **EDA Controller** tab — you should see the event received and Rule 1 (Critical CVE) matched in the activation history.
+. Open the **Splunk** tab. Within one minute, the **DCC CVE Alert** saved search will fire and send the alert through the Ansible add-on to EDA.
++
+You can verify the saved search fired by navigating to **Settings → Searches, reports, and alerts** and checking the "Last triggered" column.
++
+[TIP]
+====
+If you don't want to wait for the cron cycle, you can trigger the saved search manually: open **Search & Reporting**, find "DCC CVE Alert" in **Reports**, and click **Run**.
+====
+
+. Switch to the **EDA Controller** tab — you should see the event received and your rule matched in the rulebook activation history.
 
 . Switch to the **AAP Controller** tab and navigate to **Views → Jobs** — the **Vulnerability Containment** workflow should be launching automatically, limited to `app-server-2`.
 
@@ -369,7 +405,7 @@ curl -X POST http://eda-controller:5000/endpoint \
 . Compare the two portals:
 +
 * **Portal - rhel01**: Contained manually (Exercise 3)
-* **Portal - rhel02**: Contained automatically by EDA (this exercise)
+* **Portal - rhel02**: Contained automatically via Splunk → EDA → AAP (this exercise)
 
 The same result, but without any manual intervention on rhel02.
 
@@ -416,8 +452,9 @@ Both hosts should show identical containment posture — the difference is *how*
 
 ==== Verify
 
-* EDA received the event and matched Rule 1
-* The Vulnerability Containment workflow ran against `app-server-2` only
+* The Scan System job detected the CVE and reported it to Splunk
+* Splunk's saved search fired and the EDA add-on delivered the event
+* EDA matched the rule and triggered the Vulnerability Containment workflow against `app-server-2`
 * The Meridian Financial Portal on rhel02 is **no longer publicly accessible**
 * Both servers show identical containment: firewall, hardening, SELinux, and security headers
 * rhel01 was contained manually in minutes; rhel02 was contained automatically in seconds
@@ -429,19 +466,19 @@ You've successfully completed the DEFEND module.
 **What you accomplished:**
 
 * Investigated a critical CVE in Splunk and saw real detection data
-* Confirmed the vulnerability on rhel01 using AAP
-* Manually ran the containment workflow on rhel01 — and saw the portal go offline
-* Wrote an EDA rulebook that maps alert severity to AAP actions
-* Configured EDA Controller: credential, project, and rulebook activation
+* Confirmed the vulnerability on rhel01 using AAP's Scan System job
+* Manually ran the containment workflow on rhel01 — and verified every change from the terminal
+* Wrote an EDA rulebook that matches Splunk saved search alerts
+* Connected Splunk to EDA using the Ansible Add-on for Splunk and a Token Event Stream
 * Deployed the vulnerable application to rhel02 from AAP
-* Watched EDA automatically trigger containment on rhel02 — zero manual intervention
+* Ran a scan that triggered the full Splunk → EDA → AAP containment chain on rhel02
 * Verified both servers are contained: public access removed, SELinux hardened, service still running
 
 **Key takeaways:**
 
 * Manual response works but takes time — EDA reduces mean-time-to-contain to seconds
 * Splunk detects the threat, EDA routes the response, AAP executes the containment
-* The `job_args.limit` in the rulebook ensures the workflow targets only the affected host
+* The Splunk add-on sends the affected host from search results — the rulebook passes it as `job_args.limit` to scope the workflow
 * Containment != taking the service offline — it reduces attack surface while keeping internal access
 * Workflows chain multiple job templates into a coordinated response
 

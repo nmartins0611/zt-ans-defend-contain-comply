@@ -134,91 +134,12 @@
       delay: 5
       until: _project_status.json.import_state | default('') == 'completed'
 
-    # ── Event Stream ───────────────────────────────────────────────────
-    - name: Check existing event streams
-      ansible.builtin.uri:
-        url: "{{ eda_api }}/event-streams/?name=DCC+Splunk+Events"
-        user: "{{ eda_user }}"
-        password: "{{ eda_password }}"
-        validate_certs: false
-        force_basic_auth: true
-      register: _existing_stream
-
-    - name: Get EDA credential ID
-      ansible.builtin.uri:
-        url: "{{ eda_api }}/eda-credentials/?name=DCC+Controller+Token"
-        user: "{{ eda_user }}"
-        password: "{{ eda_password }}"
-        validate_certs: false
-        force_basic_auth: true
-      register: _cred_lookup
-
-    - name: Create event stream for Splunk webhooks
-      ansible.builtin.uri:
-        url: "{{ eda_api }}/event-streams/"
-        method: POST
-        user: "{{ eda_user }}"
-        password: "{{ eda_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: json
-        body:
-          name: "DCC Splunk Events"
-          organization_id: "{{ eda_org_id }}"
-          eda_credential_id: "{{ _cred_lookup.json.results[0].id }}"
-          event_stream_type: "basic"
-          test_mode: false
-        status_code: [201]
-      when: _existing_stream.json.count == 0
-
-    # ── Rulebook Activation ────────────────────────────────────────────
-    - name: Check existing rulebook activations
-      ansible.builtin.uri:
-        url: "{{ eda_api }}/activations/?name=DCC+CVE+Alert+Responder"
-        user: "{{ eda_user }}"
-        password: "{{ eda_password }}"
-        validate_certs: false
-        force_basic_auth: true
-      register: _existing_activation
-
-    - name: Get default Decision Environment ID
-      ansible.builtin.uri:
-        url: "{{ eda_api }}/decision-environments/"
-        user: "{{ eda_user }}"
-        password: "{{ eda_password }}"
-        validate_certs: false
-        force_basic_auth: true
-      register: _de_list
-
-    - name: Create rulebook activation
-      ansible.builtin.uri:
-        url: "{{ eda_api }}/activations/"
-        method: POST
-        user: "{{ eda_user }}"
-        password: "{{ eda_password }}"
-        validate_certs: false
-        force_basic_auth: true
-        body_format: json
-        body:
-          name: "DCC CVE Alert Responder"
-          organization_id: "{{ eda_org_id }}"
-          project_id: "{{ eda_project_id }}"
-          rulebook: "lab/rulebooks/splunk-cve-alert.yml"
-          decision_environment_id: "{{ _de_list.json.results[0].id }}"
-          eda_credential_id: "{{ _cred_lookup.json.results[0].id }}"
-          restart_policy: always
-          is_enabled: true
-          extra_var: "EDA_WEBHOOK_TOKEN: {{ eda_webhook_token }}"
-        status_code: [201]
-      when: _existing_activation.json.count == 0
-
     # ── Verification ───────────────────────────────────────────────────
     - name: Report EDA configuration status
       ansible.builtin.debug:
         msg: |
-          EDA Controller configured for DCC workshop:
+          EDA Controller pre-configured for DCC workshop:
+            Credential:          DCC Controller Token
             Project:             {{ workshop_project_name }}
-            Event Stream:        DCC Splunk Events
-            Rulebook Activation: DCC CVE Alert Responder
-            Webhook Token:       {{ eda_webhook_token }}
             Controller Token:    generated
+          Students will create: Token Event Stream, Rulebook Activation, and configure the Splunk add-on.
