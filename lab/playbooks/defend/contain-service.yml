@@ -27,6 +27,23 @@
         enabled: true
       become: true
 
+    - name: Check if containment zone exists
+      ansible.builtin.command: firewall-cmd --info-zone={{ containment_zone }}
+      register: _zone_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create containment zone
+      ansible.builtin.command: firewall-cmd --permanent --new-zone={{ containment_zone }}
+      when: _zone_check.rc != 0
+      register: _zone_created
+      changed_when: _zone_created.rc == 0
+
+    - name: Reload firewall to activate new zone
+      ansible.builtin.command: firewall-cmd --reload
+      when: _zone_created is changed
+      changed_when: true
+
     - name: Restrict firewall access to internal networks only
       ansible.posix.firewalld:
         rich_rule: "rule family=ipv4 source address={{ item }} service name={{ firewall_service }} accept"
