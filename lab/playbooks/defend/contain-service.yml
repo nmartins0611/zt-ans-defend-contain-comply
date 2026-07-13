@@ -69,6 +69,12 @@
         immediate: true
         state: enabled
 
+    - name: Check if target service is installed
+      ansible.builtin.command: rpm -q {{ target_service }}
+      register: _service_installed
+      failed_when: false
+      changed_when: false
+
     - name: Harden service configuration - disable unnecessary modules
       ansible.builtin.lineinfile:
         path: /etc/httpd/conf/httpd.conf
@@ -79,6 +85,7 @@
         - cgi_module
         - autoindex_module
         - status_module
+      when: _service_installed.rc == 0
       notify: Restart target service
 
     - name: Restrict server information exposure
@@ -86,6 +93,7 @@
         path: /etc/httpd/conf/httpd.conf
         regexp: "^ServerTokens"
         line: "ServerTokens Prod"
+      when: _service_installed.rc == 0
       notify: Restart target service
 
     - name: Disable server signature
@@ -93,6 +101,7 @@
         path: /etc/httpd/conf/httpd.conf
         regexp: "^ServerSignature"
         line: "ServerSignature Off"
+      when: _service_installed.rc == 0
       notify: Restart target service
 
     - name: Add security headers configuration
@@ -107,6 +116,7 @@
         mode: "0644"
         owner: root
         group: root
+      when: _service_installed.rc == 0
       notify: Restart target service
 
     - name: Log containment action
@@ -132,3 +142,4 @@
       ansible.builtin.systemd:
         name: "{{ target_service }}"
         state: restarted
+      when: _service_installed.rc == 0
