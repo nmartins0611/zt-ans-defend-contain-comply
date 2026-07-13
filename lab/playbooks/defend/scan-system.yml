@@ -5,7 +5,7 @@
 
   vars:
     scan_output_dir: /tmp/cve-scan-results
-    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    target_cve: "CVE-2024-38476"
 
   tasks:
     - name: Ensure scan output directory exists

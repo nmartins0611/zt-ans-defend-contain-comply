@@ -4,8 +4,8 @@
   gather_facts: true
 
   vars:
-    target_service: "{{ target_service | default('httpd') }}"
-    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    target_service: httpd
+    target_cve: "CVE-2024-38476"
     compliance_output_dir: /tmp/compliance-reports
 
   tasks:
