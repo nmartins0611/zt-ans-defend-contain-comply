@@ -78,7 +78,7 @@
     tmm_id: "{{ tmm_activation }}"
     hosts_entries:
       - ip: 192.168.1.10
-        names: control
+        names: control aap.example.org
       - ip: 192.168.1.11
         names: central
       - ip: 192.168.1.13

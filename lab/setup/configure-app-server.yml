@@ -8,6 +8,14 @@
     - vars/workshop.yml
 
   tasks:
+    # ── DNS / hosts ──────────────────────────────────────────────────
+    - name: Ensure aap.example.org resolves to controller
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^192\\.168\\.1\\.10 "
+        line: "192.168.1.10 control aap.example.org"
+        state: present
+
     # ── SELinux ────────────────────────────────────────────────────────
     - name: Ensure SELinux is enforcing
       ansible.posix.selinux:
