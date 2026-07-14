@@ -6,16 +6,22 @@ antora:
     - name: index
       label: "Introduction"
       solveButton: false
-    - name: module-01
+    - name: 01-overview
+      label: "Workshop Overview"
+      solveButton: false
+    - name: 02-details
+      label: "Workshop Details"
+      solveButton: false
+    - name: 03-module-01-defend
       label: "DEFEND: Detect and Contain"
       solveButton: false
-    - name: module-02
+    - name: 04-module-02-contain
       label: "CONTAIN: Policy-Gated Remediation"
       solveButton: false
-    - name: module-03
+    - name: 05-module-03-comply
       label: "COMPLY: Audit, Harden, Deliver"
       solveButton: false
-    - name: conclusion
+    - name: 99-conclusion
       label: "Conclusion"
       solveButton: false
 
