@@ -182,6 +182,59 @@
         state: started
         force_restart: true
 
+    # ── Splunk HEC Configuration ─────────────────────────────────────
+    - name: Wait for Splunk API before HEC setup
+      ansible.builtin.uri:
+        url: "https://localhost:{{ splunk_port }}/services/server/health/splunkd"
+        user: "{{ splunk_user }}"
+        password: "{{ splunk_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200]
+      retries: 60
+      delay: 10
+      register: _splunk_pre_health
+      until: _splunk_pre_health is succeeded
+
+    - name: Enable HEC global endpoint
+      ansible.builtin.uri:
+        url: "https://localhost:{{ splunk_port }}/servicesNS/nobody/splunk_httpinput/data/inputs/http/http"
+        method: POST
+        user: "{{ splunk_user }}"
+        password: "{{ splunk_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: form-urlencoded
+        body:
+          disabled: "0"
+        status_code: [200]
+
+    - name: Remove default HEC token (routes to wrong index)
+      ansible.builtin.uri:
+        url: "https://localhost:{{ splunk_port }}/servicesNS/nobody/splunk_httpinput/data/inputs/http/http%3A%252F%252Fsplunk_hec_token"
+        method: DELETE
+        user: "{{ splunk_user }}"
+        password: "{{ splunk_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        status_code: [200, 404]
+
+    - name: Create DCC workshop HEC token
+      ansible.builtin.uri:
+        url: "https://localhost:{{ splunk_port }}/servicesNS/nobody/splunk_httpinput/data/inputs/http"
+        method: POST
+        user: "{{ splunk_user }}"
+        password: "{{ splunk_password }}"
+        validate_certs: false
+        force_basic_auth: true
+        body_format: form-urlencoded
+        body:
+          name: dcc_workshop
+          token: "{{ splunk_hec_token }}"
+          index: main
+          sourcetype: linux_secure
+        status_code: [201, 409]
+
     # ── Health Checks ──────────────────────────────────────────────────
     - name: Wait for Splunk to be healthy
       ansible.builtin.uri:
