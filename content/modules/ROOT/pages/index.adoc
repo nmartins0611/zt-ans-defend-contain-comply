@@ -1,32 +1,37 @@
-= Defend, Contain, Comply
 include::partial$_attributes.adoc[]
 
-Welcome to the *Defend, Contain, Comply* workshop.
+= Defend, Contain, Comply
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
 
-You are a platform engineer at *{company_name}*. A Splunk alert fires: *{target_cve}* -- a critical Apache httpd SSRF vulnerability (CVSS 9.8) -- has been detected on your customer-facing application server.
+toc::[]
 
-No patch exists yet. You must *defend* the system, *contain* the threat when a patch arrives, and *comply* by delivering auditable evidence and a hardened container image.
+Welcome to the **Defend, Contain, Comply** workshop — a hands-on Ansible Automation Platform experience focused on vulnerability management.
 
-== What You Will Learn
+== What you will learn
 
-* **Module 1 -- DEFEND**: Detect the CVE, contain the vulnerable service, and harden the system posture using Event-Driven Ansible responding to Splunk alerts.
-* **Module 2 -- CONTAIN**: Apply advisory *{target_advisory}* through an OPA policy-gated workflow with approval nodes, pre-patch validation, and compliance reporting.
-* **Module 3 -- COMPLY**: Validate the system against OPA compliance baselines, apply CIS-aligned hardening, generate evidence, build a hardened container, scan it, and push it to registry.
+In this {lab_duration} workshop you will manage a complete vulnerability lifecycle on a RHEL system using AAP:
 
-== Lab Environment
+* **Module 1 — DEFEND**: Detect a critical CVE and automate containment when no patch exists
+* **Module 2 — CONTAIN**: Apply a policy-gated patching workflow once an errata is published
+* **Module 3 — COMPLY**: Validate compliance, apply CIS hardening, generate evidence, and deliver a hardened container
 
-[cols="1,2"]
-|===
-| Host | Role
+== Workshop environment
 
-| `control` | AAP Controller + EDA Controller
-| `central` | Splunk (SIEM), OPA (policy engine), errata yum repo
-| `rhel01` | Target app server ({company_name} customer portal)
-| `gitea` | Git repository (containerized)
-|===
+Your lab provides:
 
-== Prerequisites
+* AAP Controller — orchestrates all automation workflows
+* EDA Controller — receives Splunk webhook alerts and triggers responses
+* RHEL 9 application server — runs a customer-facing `httpd` instance
+* Local container registry — for supply chain delivery in Module 3
 
-This lab environment has been pre-configured. All AAP job templates, workflows, EDA rulebooks, and infrastructure services are ready.
+== How to use this guide
 
-Click *Next* to begin Module 1.
+Each module follows a progressive narrative. Commands marked with the `execute` role can be run directly from the terminal tab.
+
+IMPORTANT: Complete the modules in order — each builds on the previous one.
+
+== Ready?
+
+Start with the xref:01-overview.adoc[Workshop Overview] to understand your mission.

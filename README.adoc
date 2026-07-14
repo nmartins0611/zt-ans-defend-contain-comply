@@ -101,8 +101,8 @@ Two exercise files provide scaffolding with TODO comments, hints, and solution r
 | Exercise | Skeleton | Solution
 
 | EDA rulebook writing
-| `lab/rulebooks/splunk-cve-alert-exercise.yml`
-| `lab/rulebooks/splunk-cve-alert.yml`
+| `lab/extensions/eda/splunk-cve-alert-exercise.yml`
+| `lab/extensions/eda/splunk-cve-alert.yml`
 
 | Pre-patch OPA policy check
 | `lab/playbooks/contain/pre-patch-check-exercise.yml`
