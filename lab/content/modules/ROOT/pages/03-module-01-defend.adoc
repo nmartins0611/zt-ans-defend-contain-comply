@@ -252,20 +252,20 @@ When the Splunk saved search detects CVE events, the **Ansible Add-on for Splunk
 +
 [source,role="execute"]
 ----
-cat /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/splunk-cve-alert-exercise.yml
+cat /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/splunk-cve-alert-exercise.yml
 ----
 
 . Copy it and complete the rule:
 +
 [source,role="execute"]
 ----
-cp /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/splunk-cve-alert-exercise.yml \
-   /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/my-splunk-cve-alert.yml
+cp /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/splunk-cve-alert-exercise.yml \
+   /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-alert.yml
 ----
 +
 [source,role="execute"]
 ----
-vi /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/my-splunk-cve-alert.yml
+vi /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-alert.yml
 ----
 +
 [TIP]
@@ -279,14 +279,14 @@ The Splunk add-on sends the saved search name in `event.payload.search_name`. Us
 +
 [source,role="execute"]
 ----
-cat /var/lib/awx/projects/defend-contain-comply/lab/rulebooks/splunk-cve-alert.yml
+cat /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/splunk-cve-alert.yml
 ----
 
 . Validate the YAML syntax:
 +
 [source,role="execute"]
 ----
-python3 -c "import yaml; yaml.safe_load(open('/var/lib/awx/projects/defend-contain-comply/lab/rulebooks/my-splunk-cve-alert.yml'))" && echo "YAML OK"
+python3 -c "import yaml; yaml.safe_load(open('/var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-alert.yml'))" && echo "YAML OK"
 ----
 
 ==== Verify
@@ -328,7 +328,7 @@ The EDA credential, project, and decision environment are already configured. Yo
 +
 * Name: `DCC CVE Alert Responder`
 * Project: `Defend, Contain, Comply` (pre-configured)
-* Rulebook: select `lab/rulebooks/my-splunk-cve-alert.yml` (or `splunk-cve-alert.yml` if using the solution)
+* Rulebook: select `lab/extensions/eda/my-splunk-cve-alert.yml` (or `splunk-cve-alert.yml` if using the solution)
 * Decision Environment: select the default (pre-configured)
 * Credential: `DCC Controller Token` (pre-configured)
 * Event stream: `DCC Splunk Events`
