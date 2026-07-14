@@ -244,8 +244,8 @@ When the Splunk saved search detects CVE events, the **Ansible Add-on for Splunk
 . First, understand the payload that Splunk's add-on sends to EDA. The key fields are:
 +
 * `event.payload.search_name` — the saved search name (e.g. `"DCC CVE Alert"`)
-* `event.payload.result.host` — the affected host from search results
-* `event.payload.result.count` — number of matches
+* `event.payload.results.host` — the affected host from search results
+* `event.payload.results.count` — number of matches
 * `event.payload.app` — `"ansible_addon_for_splunk"`
 
 . Open the exercise skeleton:
@@ -272,7 +272,7 @@ vi /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-
 ====
 The Splunk add-on sends the saved search name in `event.payload.search_name`. Use the `is search()` operator for substring matching — this is more resilient than exact string comparison.
 
-*Rule 1* (CVE alert from Splunk): Match `event.payload.search_name is search("CVE Alert")`. Use `run_workflow_template` to trigger "Vulnerability Containment" with `job_args.limit` set to `event.payload.result.host`.
+*Rule 1* (CVE alert from Splunk): Match `event.payload.search_name is search("CVE Alert")`. Use `run_workflow_template` to trigger "Vulnerability Containment" with `job_args.limit` set to `event.payload.results.host`.
 ====
 
 . If you get stuck, the solution is available:
