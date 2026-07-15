@@ -27,7 +27,7 @@ antora:
 
 tabs:
   - name: "Terminal"
-    url: /wetty_rhel
+    url: /wetty_central
   - name: AAP Controller
     url: https://control-${guid}.${domain}/
     external: false
