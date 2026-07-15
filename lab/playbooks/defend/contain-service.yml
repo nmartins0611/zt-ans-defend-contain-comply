@@ -7,6 +7,7 @@
     target_service: httpd
     firewall_service: http
     containment_zone: internal-only
+    external_interface: eth0
 
   tasks:
     - name: Ensure firewalld and Python bindings are installed
@@ -24,20 +25,13 @@
         enabled: true
       become: true
 
-    # ── Stop the vulnerable service ──────────────────────────────────
     - name: Check if target service is installed
       ansible.builtin.command: rpm -q {{ target_service }}
       register: _service_installed
       failed_when: false
       changed_when: false
 
-    - name: Stop vulnerable service immediately
-      ansible.builtin.systemd:
-        name: "{{ target_service }}"
-        state: stopped
-      when: _service_installed.rc == 0
-
-    # ── Firewall containment ────────────────────────────────────────
+    # ── Firewall containment (isolate external interface) ───────────
     - name: Check if containment zone exists
       ansible.builtin.command: firewall-cmd --info-zone={{ containment_zone }}
       register: _zone_check
@@ -54,6 +48,22 @@
       ansible.builtin.command: firewall-cmd --reload
       when: _zone_created is changed
       changed_when: true
+
+    - name: Allow only SSH in containment zone
+      ansible.posix.firewalld:
+        service: ssh
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ containment_zone }}"
+
+    - name: Move external interface to containment zone
+      ansible.posix.firewalld:
+        zone: "{{ containment_zone }}"
+        interface: "{{ external_interface }}"
+        permanent: true
+        immediate: true
+        state: enabled
 
     - name: Remove HTTP from public zone
       ansible.posix.firewalld:
@@ -73,15 +83,6 @@
         zone: public
       failed_when: false
 
-    - name: Move all network interfaces to containment zone
-      ansible.posix.firewalld:
-        zone: "{{ containment_zone }}"
-        interface: "{{ item }}"
-        permanent: true
-        immediate: true
-        state: enabled
-      loop: "{{ ansible_interfaces | reject('equalto', 'lo') | list }}"
-
     # ── Harden service configuration ────────────────────────────────
     - name: Harden service configuration - disable unnecessary modules
       ansible.builtin.lineinfile:
@@ -94,6 +95,7 @@
         - autoindex_module
         - status_module
       when: _service_installed.rc == 0
+      notify: Restart target service
 
     - name: Restrict server information exposure
       ansible.builtin.lineinfile:
@@ -101,6 +103,7 @@
         regexp: "^ServerTokens"
         line: "ServerTokens Prod"
       when: _service_installed.rc == 0
+      notify: Restart target service
 
     - name: Disable server signature
       ansible.builtin.lineinfile:
@@ -108,6 +111,7 @@
         regexp: "^ServerSignature"
         line: "ServerSignature Off"
       when: _service_installed.rc == 0
+      notify: Restart target service
 
     - name: Add security headers configuration
       ansible.builtin.copy:
@@ -122,12 +126,16 @@
         owner: root
         group: root
       when: _service_installed.rc == 0
+      notify: Restart target service
 
     # ── Logging ─────────────────────────────────────────────────────
     - name: Log containment action
       ansible.builtin.lineinfile:
         path: /var/log/containment-actions.log
-        line: "{{ ansible_date_time.iso8601 }} | CONTAINED | {{ target_service }} | service stopped, interfaces moved to {{ containment_zone }} zone"
+        line: >-
+          {{ ansible_date_time.iso8601 }} | CONTAINED | {{ target_service }}
+          | external interface ({{ external_interface }}) moved to {{ containment_zone }} zone,
+          http/https removed from public, service hardened and still running on internal network
         create: true
         mode: "0640"
 
@@ -139,5 +147,15 @@
           host: "{{ inventory_hostname }}"
           service: "{{ target_service }}"
           zone: "{{ containment_zone }}"
+          isolated_interface: "{{ external_interface }}"
           timestamp: "{{ ansible_date_time.iso8601 }}"
-          message: "Service {{ target_service }} stopped and contained to zone {{ containment_zone }}"
+          message: >-
+            External interface {{ external_interface }} isolated to {{ containment_zone }}.
+            Service {{ target_service }} restricted to internal network only.
+
+  handlers:
+    - name: Restart target service
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+        state: restarted
+      when: _service_installed.rc == 0
