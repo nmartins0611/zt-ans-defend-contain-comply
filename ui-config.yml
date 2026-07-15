@@ -31,21 +31,15 @@ tabs:
   - name: AAP Controller
     url: https://control-${guid}.${domain}/
     external: false
-  - name: EDA Controller
-    url: https://eda-${guid}.${domain}/
-    external: false
   - name: "Portal - rhel01"
     url: https://app-${guid}.${domain}/
-    external: false
+    external: true
   - name: "Portal - rhel02"
     url: https://app2-${guid}.${domain}/
-    external: false
+    external: true
   - name: Splunk
     url: https://splunk-http-${guid}.${domain}
     external: true
-  - name: OPA
-    url: https://opa-http-${guid}.${domain}
-    external: false
   - name: Gitea
     url: https://gitea-${guid}.${domain}/
-    external: false
+    external: true
