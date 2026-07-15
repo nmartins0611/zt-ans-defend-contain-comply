@@ -1,0 +1,117 @@
+---
+- name: Restore system to pre-containment state
+  hosts: appservers
+  gather_facts: true
+
+  vars:
+    target_service: httpd
+    firewall_service: http
+    containment_zone: internal-only
+    external_interface: eth0
+
+  tasks:
+    # ── Firewall: move external interface back to public ────────────
+    - name: Move external interface back to public zone
+      ansible.posix.firewalld:
+        zone: public
+        interface: "{{ external_interface }}"
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Restore HTTP in public zone
+      ansible.posix.firewalld:
+        service: "{{ firewall_service }}"
+        zone: public
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Restore HTTPS in public zone
+      ansible.posix.firewalld:
+        service: https
+        zone: public
+        permanent: true
+        immediate: true
+        state: enabled
+
+    # ── Undo httpd hardening ────────────────────────────────────────
+    - name: Check if target service is installed
+      ansible.builtin.command: rpm -q {{ target_service }}
+      register: _service_installed
+      failed_when: false
+      changed_when: false
+
+    - name: Remove security headers configuration
+      ansible.builtin.file:
+        path: /etc/httpd/conf.d/security-containment.conf
+        state: absent
+      when: _service_installed.rc == 0
+      notify: Restart target service
+
+    - name: Restore ServerTokens to default
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^ServerTokens"
+        line: "ServerTokens OS"
+      when: _service_installed.rc == 0
+      notify: Restart target service
+
+    - name: Restore ServerSignature to default
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^ServerSignature"
+        line: "ServerSignature On"
+      when: _service_installed.rc == 0
+      notify: Restart target service
+
+    # ── Undo SELinux hardening ──────────────────────────────────────
+    - name: Restore SELinux booleans to defaults
+      ansible.posix.seboolean:
+        name: "{{ item }}"
+        state: true
+        persistent: true
+      loop:
+        - httpd_can_network_connect
+        - httpd_can_sendmail
+        - httpd_enable_cgi
+        - httpd_use_nfs
+
+    # ── Remove AIDE cron ────────────────────────────────────────────
+    - name: Remove AIDE integrity check cron job
+      ansible.builtin.cron:
+        name: "AIDE integrity check"
+        user: root
+        state: absent
+
+    # ── Ensure httpd is running ─────────────────────────────────────
+    - name: Reset httpd failed state if needed
+      ansible.builtin.command: systemctl reset-failed httpd
+      changed_when: false
+      failed_when: false
+      when: _service_installed.rc == 0
+
+    - name: Ensure httpd is started and enabled
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+        state: started
+        enabled: true
+      when: _service_installed.rc == 0
+
+    # ── Logging ─────────────────────────────────────────────────────
+    - name: Log restoration action
+      ansible.builtin.lineinfile:
+        path: /var/log/containment-actions.log
+        line: >-
+          {{ ansible_date_time.iso8601 }} | RESTORED | {{ target_service }}
+          | pre-containment state restored, {{ external_interface }} back in public zone,
+          httpd hardening reverted, SELinux booleans reset, service running
+        create: true
+        mode: "0640"
+
+  handlers:
+    - name: Restart target service
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+        state: restarted
+      when: _service_installed.rc == 0
