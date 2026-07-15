@@ -111,10 +111,64 @@ The CVE is confirmed. The vulnerable `httpd-2.4.57-5.el9` package is installed o
 
 [NOTE.why]
 ====
-*Why we do this:* The workflow chains three distinct security responses that work together. *Scan* confirms the vulnerability is real before taking action. *Contain* restricts network access without killing the service — the firewall moves the interface to an internal-only zone with RFC 1918 source restrictions, reducing the attack surface from "anyone on the internet" to "only internal networks." httpd keeps running because an abrupt shutdown could disrupt legitimate internal users and trigger cascading failures. *Harden* applies defense-in-depth — SELinux booleans block outbound connections (preventing SSRF exploitation even from allowed sources), and AIDE establishes a file integrity baseline so any tampering is detected. Running this manually first makes the time cost visible — every minute between detection and containment is a window an attacker can exploit.
+*Why we do this:* The workflow chains three distinct security responses that work together. *Scan* confirms the vulnerability is real before taking action. *Contain* stops the vulnerable service and locks down the firewall — every network interface moves into an `internal-only` zone with no allowed services, blocking all HTTP/HTTPS traffic. *Harden* applies defense-in-depth — SELinux booleans block outbound connections (preventing SSRF exploitation), and AIDE establishes a file integrity baseline so any tampering is detected. Running this manually first makes the time cost visible — every minute between detection and containment is a window an attacker can exploit.
 ====
 
-Now contain the threat by running the Vulnerability Containment workflow manually.
+[NOTE]
+====
+*Real-world context:* In a production environment you would rarely jump straight to stopping a service. Incident response teams typically follow a graduated approach:
+
+* *Level 1 — Network restriction:* Block external access via WAF or firewall rules but keep the service running for internal users.
+* *Level 2 — Harden in place:* Disable the vulnerable module (e.g. `mod_rewrite` for this CVE) and add WAF rules to block the exploit pattern. Service stays up with a reduced attack surface.
+* *Level 3 — Graceful isolation:* Drain connections from the load balancer, redirect traffic to a standby or maintenance page, patch behind the LB, then restore.
+* *Level 4 — Full stop:* Stop the service entirely. Only justified when the CVE is actively being exploited and no in-place mitigation exists.
+
+In this workshop we use **Level 4** so the containment result is immediately visible — the portal goes down and you can verify the full change from the terminal. The automated recovery in Module 2 (patch → restore) completes the cycle, demonstrating the end-to-end workflow from detection through remediation.
+====
+
+==== Establish the baseline (before containment)
+
+Before running the containment workflow, capture the current state so you can see exactly what changes.
+
+. Check which firewall zone each network interface is in:
++
+[source,role="execute"]
+----
+ssh rhel01 sudo firewall-cmd --get-active-zones
+----
++
+Both `eth0` and `eth1` should be in the `public` zone.
+
+. See what services are currently allowed through the public zone:
++
+[source,role="execute"]
+----
+ssh rhel01 sudo firewall-cmd --zone=public --list-all
+----
++
+You should see `http`, `https`, `ssh`, and other services listed — the system is wide open.
+
+. Confirm httpd is running and serving the portal:
++
+[source,role="execute"]
+----
+ssh rhel01 sudo systemctl status httpd --no-pager | head -5
+----
+
+. Verify the portal responds:
++
+[source,role="execute"]
+----
+ssh rhel01 curl -so /dev/null -w "HTTP %{http_code}\n" http://localhost
+----
++
+Expected: `HTTP 200`.
+
+. Click the **Portal - rhel01** tab and confirm the Meridian Financial portal loads normally.
+
+NOTE: Keep this baseline in mind — after the workflow runs, every one of these will change.
+
+==== Run the containment workflow
 
 . In AAP Controller, navigate to **Resources → Templates** and find the **Vulnerability Containment** workflow template.
 
@@ -123,41 +177,59 @@ Now contain the threat by running the Vulnerability Containment workflow manuall
 . Watch the workflow execute three steps in sequence:
 +
 * **DEFEND - Scan System** — confirms {target_cve} is present
-* **DEFEND - Contain Service** — restricts network access and hardens httpd configuration
+* **DEFEND - Contain Service** — stops httpd and moves all interfaces to the `internal-only` firewall zone
 * **DEFEND - Harden Posture** — applies SELinux booleans and deploys file integrity monitoring
 
 . Wait for the workflow to complete successfully.
 
-. Click the **Portal - rhel01** tab and refresh the page. The portal should **no longer be accessible** — the containment workflow moved httpd to an internal-only firewall zone.
+==== Verify the containment
 
-. Now open the terminal and verify what changed. Start with the **firewall containment** — check that `http` has been removed from the public zone:
+. Click the **Portal - rhel01** tab and refresh the page. The portal should **no longer be accessible** — the containment workflow stopped httpd and moved all network interfaces into a restricted firewall zone.
+
+. Now open the terminal and verify what changed. Start with the **service state** — httpd should be stopped:
++
+[source,role="execute"]
+----
+ssh rhel01 sudo systemctl status httpd --no-pager | head -5
+----
++
+Expected: `inactive (dead)`.
+
+. Confirm the portal no longer responds:
++
+[source,role="execute"]
+----
+ssh rhel01 curl -so /dev/null -w "HTTP %{http_code}\n" --connect-timeout 3 http://localhost 2>&1 || echo "Connection refused — service is down"
+----
+
+. Check the **firewall zones** — all interfaces should have moved to `internal-only`:
++
+[source,role="execute"]
+----
+ssh rhel01 sudo firewall-cmd --get-active-zones
+----
++
+Both `eth0` and `eth1` should now be in the `internal-only` zone. The `public` zone should have no interfaces.
+
+. Verify `http` and `https` are no longer in the **public** zone:
 +
 [source,role="execute"]
 ----
 ssh rhel01 sudo firewall-cmd --zone=public --list-services
 ----
 +
-The `http` and `https` services should no longer appear.
+Neither `http` nor `https` should appear.
 
-. Inspect the `internal-only` zone — this is where access is now restricted to:
+. Inspect the **internal-only** zone:
 +
 [source,role="execute"]
 ----
 ssh rhel01 sudo firewall-cmd --zone=internal-only --list-all
 ----
 +
-You should see rich rules allowing `http` only from `10.0.0.0/8` and `172.16.0.0/12`, and the network interface assigned to this zone.
+You should see both network interfaces assigned but no services or ports allowed — the system is locked down.
 
-. Verify the **httpd hardening** — disabled modules:
-+
-[source,role="execute"]
-----
-ssh rhel01 httpd -M 2>/dev/null | grep -E "cgi|autoindex|status" || echo "Modules disabled: cgi, autoindex, status"
-----
-+
-None of the three modules should appear in the loaded module list.
-
-. Check that **server information exposure** is minimized:
+. Verify the **httpd hardening** was applied (these changes wait for the service to be brought back after patching):
 +
 [source,role="execute"]
 ----
@@ -174,15 +246,6 @@ ssh rhel01 cat /etc/httpd/conf.d/security-containment.conf
 ----
 +
 You should see `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, and `Referrer-Policy` headers.
-
-. Test the headers are being served by making an internal request:
-+
-[source,role="execute"]
-----
-ssh rhel01 curl -sI http://localhost | grep -iE "X-Content-Type|X-Frame|Content-Security|Referrer-Policy|Server:"
-----
-+
-The security headers should appear in the response, and the `Server:` header should show only `Apache` (no version details, thanks to `ServerTokens Prod`).
 
 . Verify **SELinux booleans** are enforced (from the Harden Posture step):
 +
@@ -202,13 +265,6 @@ ssh rhel01 sudo crontab -l | grep aide
 +
 You should see a cron entry running AIDE checks every 4 hours.
 
-. Confirm the service is still running (contained, not killed):
-+
-[source,role="execute"]
-----
-ssh rhel01 sudo systemctl status httpd --no-pager
-----
-
 . Check the **containment log** for the audit trail:
 +
 [source,role="execute"]
@@ -219,14 +275,13 @@ ssh rhel01 cat /var/log/containment-actions.log
 ==== Verify
 
 * The Vulnerability Containment workflow completed successfully
-* The Meridian Financial Portal on rhel01 is **no longer publicly accessible**
-* Firewall `internal-only` zone has rich rules restricting access to RFC 1918 ranges only
-* httpd modules `cgi`, `autoindex`, and `status` are disabled
-* `ServerTokens Prod` and `ServerSignature Off` minimize information exposure
-* Security headers (`X-Frame-Options`, `CSP`, etc.) are present in HTTP responses
+* The Meridian Financial Portal on rhel01 is **no longer accessible**
+* httpd is stopped (`inactive (dead)`)
+* All network interfaces moved to the `internal-only` zone
+* `http` and `https` removed from the `public` zone
+* httpd configuration hardened (`ServerTokens Prod`, `ServerSignature Off`, security headers deployed)
 * SELinux booleans prevent outbound connections, CGI, mail, and NFS
 * AIDE file integrity monitoring is scheduled
-* httpd is still active — service is contained, not disrupted
 
 **That manual process took several minutes.** In Part 2, you will automate it.
 
@@ -409,26 +464,21 @@ If you don't want to wait for the cron cycle, you can trigger the saved search m
 
 The same result, but without any manual intervention on rhel02.
 
-. Verify containment on rhel02 from the terminal — confirm the firewall was locked down:
+. Verify containment on rhel02 from the terminal — confirm httpd is stopped and the firewall is locked down:
 +
 [source,role="execute"]
 ----
-ssh rhel02 sudo firewall-cmd --zone=internal-only --list-all
+ssh rhel02 sudo systemctl status httpd --no-pager | head -5
 ----
 +
-You should see the same rich rules and interface assignment as rhel01.
-
-. Verify hardening was applied identically:
+Expected: `inactive (dead)`.
 +
 [source,role="execute"]
 ----
-ssh rhel02 grep -E "^ServerTokens|^ServerSignature" /etc/httpd/conf/httpd.conf
+ssh rhel02 sudo firewall-cmd --get-active-zones
 ----
 +
-[source,role="execute"]
-----
-ssh rhel02 getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail httpd_use_nfs
-----
+Both interfaces should be in the `internal-only` zone, same as rhel01.
 
 . Compare the containment state across both hosts side by side:
 +
@@ -436,19 +486,19 @@ ssh rhel02 getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendma
 ----
 for host in rhel01 rhel02; do
   echo "=== $host ==="
-  echo "-- Firewall public zone --"
-  ssh $host sudo firewall-cmd --zone=public --list-services
+  echo "-- Service state --"
+  ssh $host sudo systemctl is-active httpd
+  echo "-- Active zones --"
+  ssh $host sudo firewall-cmd --get-active-zones
   echo "-- SELinux booleans --"
   ssh $host getsebool httpd_can_network_connect httpd_enable_cgi
-  echo "-- Security headers --"
-  ssh $host curl -sI http://localhost | grep -i "X-Frame-Options"
   echo "-- Containment log --"
   ssh $host cat /var/log/containment-actions.log 2>/dev/null
   echo ""
 done
 ----
 +
-Both hosts should show identical containment posture — the difference is *how* they got there.
+Both hosts should show identical containment posture — httpd stopped, all interfaces in `internal-only`, SELinux hardened. The difference is *how* they got there.
 
 ==== Verify
 
@@ -472,14 +522,14 @@ You've successfully completed the DEFEND module.
 * Connected Splunk to EDA using the Ansible Add-on for Splunk and a Token Event Stream
 * Deployed the vulnerable application to rhel02 from AAP
 * Ran a scan that triggered the full Splunk → EDA → AAP containment chain on rhel02
-* Verified both servers are contained: public access removed, SELinux hardened, service still running
+* Verified both servers are contained: httpd stopped, interfaces locked down, SELinux hardened
 
 **Key takeaways:**
 
 * Manual response works but takes time — EDA reduces mean-time-to-contain to seconds
 * Splunk detects the threat, EDA routes the response, AAP executes the containment
 * The Splunk add-on sends the affected host from search results — the rulebook passes it as `job_args.limit` to scope the workflow
-* Containment != taking the service offline — it reduces attack surface while keeping internal access
+* In production, containment is graduated (restrict → harden → isolate → stop) — we use full stop here for clarity; the recovery cycle in Module 2 brings the service back
 * Workflows chain multiple templates into a coordinated response
 
 **Next steps:**

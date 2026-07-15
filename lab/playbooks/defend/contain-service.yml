@@ -6,9 +6,6 @@
   vars:
     target_service: httpd
     firewall_service: http
-    allowed_sources:
-      - "10.0.0.0/8"
-      - "172.16.0.0/12"
     containment_zone: internal-only
 
   tasks:
@@ -27,6 +24,20 @@
         enabled: true
       become: true
 
+    # ── Stop the vulnerable service ──────────────────────────────────
+    - name: Check if target service is installed
+      ansible.builtin.command: rpm -q {{ target_service }}
+      register: _service_installed
+      failed_when: false
+      changed_when: false
+
+    - name: Stop vulnerable service immediately
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+        state: stopped
+      when: _service_installed.rc == 0
+
+    # ── Firewall containment ────────────────────────────────────────
     - name: Check if containment zone exists
       ansible.builtin.command: firewall-cmd --info-zone={{ containment_zone }}
       register: _zone_check
@@ -44,37 +55,34 @@
       when: _zone_created is changed
       changed_when: true
 
-    - name: Restrict firewall access to internal networks only
-      ansible.posix.firewalld:
-        rich_rule: "rule family=ipv4 source address={{ item }} service name={{ firewall_service }} accept"
-        permanent: true
-        immediate: true
-        state: enabled
-        zone: "{{ containment_zone }}"
-      loop: "{{ allowed_sources }}"
-
-    - name: Remove public access to the service
+    - name: Remove HTTP from public zone
       ansible.posix.firewalld:
         service: "{{ firewall_service }}"
         permanent: true
         immediate: true
         state: disabled
         zone: public
+      failed_when: false
 
-    - name: Move service interface to containment zone
+    - name: Remove HTTPS from public zone
+      ansible.posix.firewalld:
+        service: https
+        permanent: true
+        immediate: true
+        state: disabled
+        zone: public
+      failed_when: false
+
+    - name: Move all network interfaces to containment zone
       ansible.posix.firewalld:
         zone: "{{ containment_zone }}"
-        interface: "{{ ansible_default_ipv4.interface }}"
+        interface: "{{ item }}"
         permanent: true
         immediate: true
         state: enabled
+      loop: "{{ ansible_interfaces | reject('equalto', 'lo') | list }}"
 
-    - name: Check if target service is installed
-      ansible.builtin.command: rpm -q {{ target_service }}
-      register: _service_installed
-      failed_when: false
-      changed_when: false
-
+    # ── Harden service configuration ────────────────────────────────
     - name: Harden service configuration - disable unnecessary modules
       ansible.builtin.lineinfile:
         path: /etc/httpd/conf/httpd.conf
@@ -86,7 +94,6 @@
         - autoindex_module
         - status_module
       when: _service_installed.rc == 0
-      notify: Restart target service
 
     - name: Restrict server information exposure
       ansible.builtin.lineinfile:
@@ -94,7 +101,6 @@
         regexp: "^ServerTokens"
         line: "ServerTokens Prod"
       when: _service_installed.rc == 0
-      notify: Restart target service
 
     - name: Disable server signature
       ansible.builtin.lineinfile:
@@ -102,7 +108,6 @@
         regexp: "^ServerSignature"
         line: "ServerSignature Off"
       when: _service_installed.rc == 0
-      notify: Restart target service
 
     - name: Add security headers configuration
       ansible.builtin.copy:
@@ -117,12 +122,12 @@
         owner: root
         group: root
       when: _service_installed.rc == 0
-      notify: Restart target service
 
+    # ── Logging ─────────────────────────────────────────────────────
     - name: Log containment action
       ansible.builtin.lineinfile:
         path: /var/log/containment-actions.log
-        line: "{{ ansible_date_time.iso8601 }} | CONTAINED | {{ target_service }} | restricted to internal-only access"
+        line: "{{ ansible_date_time.iso8601 }} | CONTAINED | {{ target_service }} | service stopped, interfaces moved to {{ containment_zone }} zone"
         create: true
         mode: "0640"
 
@@ -135,11 +140,4 @@
           service: "{{ target_service }}"
           zone: "{{ containment_zone }}"
           timestamp: "{{ ansible_date_time.iso8601 }}"
-          message: "Service {{ target_service }} contained to zone {{ containment_zone }}"
-
-  handlers:
-    - name: Restart target service
-      ansible.builtin.systemd:
-        name: "{{ target_service }}"
-        state: restarted
-      when: _service_installed.rc == 0
+          message: "Service {{ target_service }} stopped and contained to zone {{ containment_zone }}"
