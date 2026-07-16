@@ -305,25 +305,9 @@ When the Splunk saved search detects CVE events, the **Ansible Add-on for Splunk
 * `event.payload.results.count` — number of matches
 * `event.payload.app` — `"ansible_addon_for_splunk"`
 
-. Open the exercise skeleton:
-+
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/splunk-cve-alert-exercise.yml
-----
+. In the *Gitea* tab, navigate to `lab/extensions/eda/splunk-cve-alert-exercise.yml` and read through the exercise skeleton.
 
-. Copy it and complete the rule:
-+
-[source,role="execute"]
-----
-cp /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/splunk-cve-alert-exercise.yml \
-   /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-alert.yml
-----
-+
-[source,role="execute"]
-----
-vi /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-alert.yml
-----
+. Open `lab/extensions/eda/splunk-cve-alert.yml` in Gitea, click the pencil icon to edit, and complete the rule using the hints from the exercise skeleton.
 +
 [TIP]
 ====
@@ -332,19 +316,9 @@ The Splunk add-on sends the saved search name in `event.payload.search_name`. Us
 *Rule 1* (CVE alert from Splunk): Match `event.payload.search_name is search("CVE Alert")`. Use `run_workflow_template` to trigger "Vulnerability Containment" with `job_args.limit` set to `event.payload.results.host`.
 ====
 
-. If you get stuck, the solution is available:
-+
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/splunk-cve-alert.yml
-----
+. If you get stuck, the complete solution is in Gitea at `lab/extensions/eda/splunk-cve-alert-exercise.yml` — compare the TODO comments with the completed tasks in the solution.
 
-. Validate the YAML syntax:
-+
-[source,role="execute"]
-----
-python3 -c "import yaml; yaml.safe_load(open('/var/lib/awx/projects/defend-contain-comply/lab/extensions/eda/my-splunk-cve-alert.yml'))" && echo "YAML OK"
-----
+. Commit your changes in Gitea, then sync the EDA project in EDA Controller (*Projects → Defend, Contain, Comply → Sync*).
 
 ==== Verify
 
