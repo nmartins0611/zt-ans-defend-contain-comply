@@ -34,7 +34,7 @@ By the end of this module, you'll be able to:
 
 Your security team has flagged unusual activity. Start by investigating what Splunk has detected.
 
-. Click the **Portal - rhel01** tab in the workshop sidebar. This is the Meridian Financial customer portal — a production application running on `rhel01`. Confirm it is up and publicly accessible.
+. Click the **Portal - rhel01** tab in the workshop sidebar. This is the Benekratis Capital customer portal — a production application running on `rhel01`. Confirm it is up and publicly accessible.
 
 . Open the **Splunk** tab and log in:
 +
@@ -73,7 +73,7 @@ This groups the findings by host and log source — this is the query that power
 
 ==== Verify
 
-* The Meridian Financial Portal on rhel01 is accessible in your browser
+* The Benekratis Capital Portal on rhel01 is accessible in your browser
 * You can see vulnerability events in Splunk referencing {target_cve}
 * The saved search "DCC CVE Alert" exists and is scheduled
 
@@ -163,7 +163,7 @@ ssh rhel01 curl -so /dev/null -w "HTTP %{http_code}\n" http://localhost
 +
 Expected: `HTTP 200`.
 
-. Click the **Portal - rhel01** tab and confirm the Meridian Financial portal loads normally.
+. Click the **Portal - rhel01** tab and confirm the Benekratis Capital portal loads normally.
 
 NOTE: Keep this baseline in mind — after the workflow runs, every one of these will change.
 
@@ -386,7 +386,7 @@ Now deploy the same vulnerable application to a second server.
 
 . Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `app-server-2` to target only rhel02.
 
-. Wait for the job to complete. It deploys the vulnerable httpd, the Meridian Financial portal, and configures the errata repository.
+. Wait for the job to complete. It deploys the vulnerable httpd, the Benekratis Capital portal, and configures the errata repository.
 
 . Click the **Portal - rhel02** tab and confirm the portal is now up and accessible.
 
@@ -402,7 +402,7 @@ You should now see events for **both** `rhel01` and `app-server-2`.
 ==== Verify
 
 * The DEFEND - Deploy Application job completed successfully
-* The Meridian Financial Portal on rhel02 is accessible
+* The Benekratis Capital Portal on rhel02 is accessible
 * Splunk shows CVE events for both hosts
 
 === Exercise 7: Trigger EDA and Watch Automated Containment
@@ -477,7 +477,7 @@ Both hosts should show identical containment posture — external interface isol
 * The DEFEND - Scan System job detected the CVE and reported it to Splunk
 * Splunk's saved search fired and the EDA add-on delivered the event
 * EDA matched the rule and triggered the Vulnerability Containment workflow against `app-server-2`
-* The Meridian Financial Portal on rhel02 is **no longer publicly accessible**
+* The Benekratis Capital Portal on rhel02 is **no longer publicly accessible**
 * Both servers show identical containment: firewall, hardening, SELinux, and security headers
 * rhel01 was contained manually in minutes; rhel02 was contained automatically in seconds
 

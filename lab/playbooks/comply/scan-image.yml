@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    container_name: meridian-app
+    container_name: benekratis-app
     container_tag: latest
     registry_url: "localhost:5000"
     scan_output_dir: /tmp/container-scan-results

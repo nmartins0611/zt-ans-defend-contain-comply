@@ -2,10 +2,10 @@
 # Patch Policy Definition
 # Enforced by pre-patch-check.yml before any patching workflow executes
 policy:
-  name: meridian-financial-patch-policy
+  name: benekratis-capital-patch-policy
   version: "1.0"
   description: >
-    Patching prerequisites for Meridian Financial production systems.
+    Patching prerequisites for Benekratis Capital production systems.
     All conditions must pass before advisory application is permitted.
 
 gates:
@@ -51,7 +51,7 @@ notifications:
     - type: webhook
       url: "{{ notification_webhook_url }}"
     - type: email
-      recipients: platform-team@meridian.example.com
+      recipients: platform-team@benekratis.example.com
   on_patch_success:
     - type: webhook
       url: "{{ notification_webhook_url }}"

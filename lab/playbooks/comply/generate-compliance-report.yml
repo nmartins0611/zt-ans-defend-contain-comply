@@ -7,7 +7,7 @@
     report_output_dir: /tmp/compliance-reports
     target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
     target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
-    organization: Meridian Financial
+    organization: Benekratis Capital
 
   tasks:
     - name: Ensure report directory exists

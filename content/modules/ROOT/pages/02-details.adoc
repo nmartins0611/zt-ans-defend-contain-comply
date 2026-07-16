@@ -89,7 +89,7 @@ All job templates are prefixed with their module name so you can find them quick
 |===
 | Module | Template | What it does
 
-| DEFEND | DEFEND - Deploy Application | Deploy vulnerable httpd and Meridian Financial portal to a target host
+| DEFEND | DEFEND - Deploy Application | Deploy vulnerable httpd and Benekratis Capital portal to a target host
 | DEFEND | DEFEND - Scan System | Check for CVE-2024-38476 on target, report to Splunk if found
 | DEFEND | DEFEND - Contain Service | Firewall restrictions, httpd hardening, security headers
 | DEFEND | DEFEND - Harden Posture | SELinux booleans and AIDE file integrity monitoring

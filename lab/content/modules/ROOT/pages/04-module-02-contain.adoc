@@ -9,7 +9,7 @@ toc::[]
 
 Red Hat has published **RHSA-2024:5138** — a security advisory addressing CVE-2024-38476 in Apache HTTP Server. A patched `httpd` package is now available in your repositories.
 
-However, Meridian Financial's change management policy requires that patches pass several gates before application: backup verification, maintenance window check, approval, and post-patch compliance validation.
+However, Benekratis Capital's change management policy requires that patches pass several gates before application: backup verification, maintenance window check, approval, and post-patch compliance validation.
 
 In this module you will build and execute a policy-gated patching workflow in AAP Controller.
 
@@ -29,7 +29,7 @@ By the end of this module, you'll be able to:
 *Why we do this:* In regulated environments, you can't just apply patches whenever you want. Change management policies exist because rushed patches cause outages. OPA (Open Policy Agent) codifies these policies so they can be evaluated automatically: Is there a recent backup? Are we in a maintenance window? Is there enough disk space? Is the service healthy? Policy-as-code means the rules are version-controlled, auditable, and consistently enforced — no more "I thought it was OK to patch during business hours."
 ====
 
-Before writing the playbook, understand the policies that govern patching at Meridian Financial.
+Before writing the playbook, understand the policies that govern patching at Benekratis Capital.
 
 . Open the *Gitea* tab and navigate to `lab/policies/patch-policy.yml` to review the patch policy definition.
 +

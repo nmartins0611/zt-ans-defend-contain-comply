@@ -107,7 +107,7 @@
         extra_vars:
           target_cve: "{{ target_cve }}"
           target_advisory: "{{ target_advisory }}"
-        description: "Module 1: Deploy vulnerable httpd and Meridian Financial portal"
+        description: "Module 1: Deploy vulnerable httpd and Benekratis Capital portal"
         state: present
 
     - name: Create job template -- DEFEND - Scan System
