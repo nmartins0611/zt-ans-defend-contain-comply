@@ -96,21 +96,13 @@ Click the rocket icon to **Launch**. When prompted for extra variables, ensure `
 audit_phase: pre
 ----
 +
-Or from the terminal:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/comply/compliance-audit.yml -i inventory/workshop.yml -e "audit_phase=pre"
-----
-
 . Wait for the job to complete. The playbook gathers system facts from the target host, sends them to OPA for evaluation, and writes the results to a JSON file.
 
-. Review the audit results:
+. Review the audit results on rhel01:
 +
 [source,role="execute"]
 ----
-cat /tmp/compliance-reports/audit-results-pre.json | python3 -m json.tool
+ssh rhel01 'cat /tmp/compliance-reports/audit-results-pre.json | python3 -m json.tool'
 ----
 +
 Each control shows `pass` or `fail` with the control ID and category.
@@ -119,27 +111,27 @@ Each control shows `pass` or `fail` with the control ID and category.
 +
 [source,role="execute"]
 ----
-cat /tmp/compliance-reports/audit-results-pre.json | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-controls = data.get('controls', [])
-passed = sum(1 for c in controls if c.get('pass'))
-failed = sum(1 for c in controls if not c.get('pass'))
-print(f'Controls: {passed} passed, {failed} failed, {len(controls)} total')
-"
+ssh rhel01 "python3 -c '
+import json
+data = json.load(open(\"/tmp/compliance-reports/audit-results-pre.json\"))
+controls = data.get(\"controls\", [])
+passed = sum(1 for c in controls if c.get(\"pass\"))
+failed = sum(1 for c in controls if not c.get(\"pass\"))
+print(f\"Controls: {passed} passed, {failed} failed, {len(controls)} total\")
+'"
 ----
 
 . Identify which controls failed — these are the ones the CIS hardening will remediate:
 +
 [source,role="execute"]
 ----
-cat /tmp/compliance-reports/audit-results-pre.json | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for c in data.get('controls', []):
-    status = 'PASS' if c.get('pass') else 'FAIL'
-    print(f'  [{status}] {c.get(\"id\", \"unknown\")}: {c.get(\"description\", \"\")}')
-"
+ssh rhel01 "python3 -c '
+import json
+data = json.load(open(\"/tmp/compliance-reports/audit-results-pre.json\"))
+for c in data.get(\"controls\", []):
+    status = \"PASS\" if c.get(\"pass\") else \"FAIL\"
+    print(f\"  [{status}] {c.get(\"id\", \"unknown\")}: {c.get(\"description\", \"\")}\")
+'"
 ----
 +
 Some controls may already pass from Module 1 hardening (e.g., SELinux). Others require CIS-level remediation.
@@ -160,14 +152,6 @@ Some controls may already pass from Module 1 hardening (e.g., SELinux). Others r
 Run the hardening playbook that remediates failed compliance controls.
 
 . In AAP Controller, navigate to **Resources → Templates** and launch **COMPLY - CIS Harden**.
-+
-Or from the terminal:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/comply/cis-harden.yml -i inventory/workshop.yml
-----
 
 . Watch the job output. The playbook applies hardening in several categories. Once it completes, verify each category from the terminal.
 
@@ -175,7 +159,7 @@ ansible-playbook playbooks/comply/cis-harden.yml -i inventory/workshop.yml
 +
 [source,role="execute"]
 ----
-sudo sshd -T 2>/dev/null | grep -E "^(permitrootlogin|x11forwarding|maxauthtries|clientaliveinterval)"
+ssh rhel01 "sudo sshd -T 2>/dev/null | grep -E '^(permitrootlogin|x11forwarding|maxauthtries|clientaliveinterval)'"
 ----
 +
 Expected:
@@ -189,7 +173,7 @@ Expected:
 +
 [source,role="execute"]
 ----
-stat -c "%a %n" /etc/passwd /etc/shadow /etc/group /etc/gshadow
+ssh rhel01 'stat -c "%a %n" /etc/passwd /etc/shadow /etc/group /etc/gshadow'
 ----
 +
 Expected: `644` for passwd/group (readable by all, writable by root), `000` for shadow/gshadow (accessible only by root).
@@ -198,7 +182,7 @@ Expected: `644` for passwd/group (readable by all, writable by root), `000` for 
 +
 [source,role="execute"]
 ----
-sysctl net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.send_redirects kernel.randomize_va_space
+ssh rhel01 sysctl net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.send_redirects kernel.randomize_va_space
 ----
 +
 Expected:
@@ -211,7 +195,7 @@ Expected:
 +
 [source,role="execute"]
 ----
-systemctl is-enabled rpcbind 2>/dev/null; systemctl is-enabled avahi-daemon 2>/dev/null
+ssh rhel01 'systemctl is-enabled rpcbind 2>/dev/null; systemctl is-enabled avahi-daemon 2>/dev/null'
 ----
 +
 Expected: `disabled` or `not-found`. These services are rarely needed on application servers and expose unnecessary network ports.
@@ -240,34 +224,19 @@ In AAP Controller, launch **COMPLY - Compliance Audit** again. Set the extra var
 ----
 audit_phase: post
 ----
-+
-Or from the terminal:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/comply/compliance-audit.yml -i inventory/workshop.yml -e "audit_phase=post"
-----
 
 . Compare before and after:
 +
 [source,role="execute"]
 ----
-echo "=== PRE-HARDENING ===" && cat /tmp/compliance-reports/audit-results-pre.json | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-controls = data.get('controls', [])
-passed = sum(1 for c in controls if c.get('pass'))
-print(f'  {passed}/{len(controls)} controls passed')
-"
-echo ""
-echo "=== POST-HARDENING ===" && cat /tmp/compliance-reports/audit-results-post.json | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-controls = data.get('controls', [])
-passed = sum(1 for c in controls if c.get('pass'))
-print(f'  {passed}/{len(controls)} controls passed')
-"
+ssh rhel01 "python3 -c '
+import json
+for phase in [\"pre\", \"post\"]:
+    data = json.load(open(f\"/tmp/compliance-reports/audit-results-{phase}.json\"))
+    controls = data.get(\"controls\", [])
+    passed = sum(1 for c in controls if c.get(\"pass\"))
+    print(f\"{phase.upper()}-HARDENING: {passed}/{len(controls)} controls passed\")
+'"
 ----
 +
 The post-hardening count should be higher — ideally all controls pass.
@@ -275,26 +244,19 @@ The post-hardening count should be higher — ideally all controls pass.
 . Generate the full HTML compliance report:
 +
 In AAP Controller, launch **COMPLY - Compliance Report**.
-+
-Or from the terminal:
-+
-[source,role="execute"]
-----
-ansible-playbook playbooks/comply/generate-compliance-report.yml -i inventory/workshop.yml
-----
 
 . Verify the report was generated:
 +
 [source,role="execute"]
 ----
-ls -la /tmp/compliance-reports/compliance-report-*.html
+ssh rhel01 ls -la /tmp/compliance-reports/compliance-report-*.html
 ----
 
 . Examine the report content to confirm it contains before/after data:
 +
 [source,role="execute"]
 ----
-cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "Advisory|SELinux|Controls|PASS|FAIL" | head -20
+ssh rhel01 'cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "Advisory|SELinux|Controls|PASS|FAIL" | head -20'
 ----
 
 === Verify
@@ -313,12 +275,7 @@ cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "
 
 Now deliver the patched, hardened application as an immutable container.
 
-. First, examine the Containerfile template to understand what gets built:
-+
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/templates/Containerfile.j2
-----
+. First, examine the Containerfile template in the *Gitea* tab — navigate to `lab/templates/Containerfile.j2`.
 +
 Review the key security properties:
 +
@@ -328,14 +285,6 @@ Review the key security properties:
 * **Labels**: Include advisory reference and remediation timestamp for traceability
 
 . In AAP Controller, navigate to **Resources → Templates** and launch **COMPLY - Build Container**.
-+
-Or from the terminal:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/comply/build-container.yml -i inventory/workshop.yml
-----
 
 . Wait for the build to complete. The playbook renders the Containerfile template, runs `podman build`, and tags the resulting image.
 
@@ -343,7 +292,7 @@ ansible-playbook playbooks/comply/build-container.yml -i inventory/workshop.yml
 +
 [source,role="execute"]
 ----
-sudo podman images | grep dcc
+ssh rhel01 sudo podman images | grep dcc
 ----
 +
 You should see an image tagged with the advisory reference.
@@ -352,20 +301,20 @@ You should see an image tagged with the advisory reference.
 +
 [source,role="execute"]
 ----
-sudo podman inspect $(sudo podman images --format "{{.ID}}" | head -1) | python3 -c "
+ssh rhel01 "sudo podman inspect \$(sudo podman images --format '{{.ID}}' | head -1) | python3 -c '
 import sys, json
 data = json.load(sys.stdin)
-labels = data[0].get('Config', {}).get('Labels', {})
+labels = data[0].get(\"Config\", {}).get(\"Labels\", {})
 for k, v in labels.items():
-    print(f'  {k}: {v}')
-"
+    print(f\"  {k}: {v}\")
+'"
 ----
 
 . Check the image size — a minimal base should be significantly smaller than a full OS image:
 +
 [source,role="execute"]
 ----
-sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}" | grep dcc
+ssh rhel01 'sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}" | grep dcc'
 ----
 
 === Verify
@@ -383,31 +332,16 @@ sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}" | grep dc
 ====
 
 . In AAP Controller, navigate to **Resources → Templates** and launch **COMPLY - Scan Image**.
-+
-Or from the terminal:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/comply/scan-image.yml -i inventory/workshop.yml
-----
 
 . Review the scan output. Verify that {target_cve} is **not** present in the scan results. The patched `httpd-2.4.62` should have no critical vulnerabilities.
 
 . Now push the verified image to the local registry. In AAP Controller, launch **COMPLY - Push to Registry**.
-+
-Or from the terminal:
-+
-[source,role="execute"]
-----
-ansible-playbook playbooks/comply/push-to-registry.yml -i inventory/workshop.yml
-----
 
 . Verify the image is in the registry:
 +
 [source,role="execute"]
 ----
-curl -s http://localhost:5000/v2/_catalog | python3 -m json.tool
+ssh rhel01 'curl -s http://localhost:5000/v2/_catalog | python3 -m json.tool'
 ----
 +
 You should see the DCC application image listed.
@@ -416,7 +350,7 @@ You should see the DCC application image listed.
 +
 [source,role="execute"]
 ----
-curl -s http://localhost:5000/v2/dcc-httpd/tags/list 2>/dev/null | python3 -m json.tool
+ssh rhel01 'curl -s http://localhost:5000/v2/dcc-httpd/tags/list 2>/dev/null | python3 -m json.tool'
 ----
 
 === Verify
@@ -465,15 +399,15 @@ In AAP Controller, click on the completed workflow job, then look at the **Extra
 [source,role="execute"]
 ----
 echo "=== Compliance Report ==="
-ls -la /tmp/compliance-reports/compliance-report-*.html
+ssh rhel01 ls -la /tmp/compliance-reports/compliance-report-*.html
 
 echo ""
 echo "=== Container Image ==="
-sudo podman images | grep dcc
+ssh rhel01 sudo podman images | grep dcc
 
 echo ""
 echo "=== Registry Catalog ==="
-curl -s http://localhost:5000/v2/_catalog | python3 -m json.tool
+ssh rhel01 'curl -s http://localhost:5000/v2/_catalog | python3 -m json.tool'
 ----
 
 === Verify

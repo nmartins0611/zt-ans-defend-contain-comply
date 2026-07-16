@@ -31,20 +31,15 @@ By the end of this module, you'll be able to:
 
 Before writing the playbook, understand the policies that govern patching at Meridian Financial.
 
-. From the terminal, review the patch policy definition:
-+
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/policies/patch-policy.yml
-----
+. Open the *Gitea* tab and navigate to `lab/policies/patch-policy.yml` to review the patch policy definition.
 +
 Note the four automatable gates: maintenance window, backup verification, disk space, and service health. The fifth gate (change approval) is enforced by an AAP approval node.
 
-. Verify the current backup state (simulated — create the marker):
+. Simulate a recent backup on the app server by creating the backup marker:
 +
 [source,role="execute"]
 ----
-sudo touch /var/log/last-backup-timestamp
+ssh rhel01 sudo touch /var/log/last-backup-timestamp
 ----
 +
 This simulates a successful backup completing within the policy window.
@@ -74,29 +69,11 @@ The patch policy defines clear, automatable prerequisites. The backup marker exi
 
 You will write a playbook that gathers system facts, sends them to OPA for evaluation, and blocks patching if any policy gates fail. A skeleton file with detailed instructions has been provided.
 
-. Examine the exercise skeleton:
-+
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/pre-patch-check-exercise.yml
-----
+. In the *Gitea* tab, navigate to `lab/playbooks/contain/pre-patch-check-exercise.yml` and read through the exercise skeleton.
 +
 Read the comments carefully — they describe the OPA input payload format and the expected response structure.
 
-. Copy the exercise file to work on it:
-+
-[source,role="execute"]
-----
-cp /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/pre-patch-check-exercise.yml \
-   /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/my-pre-patch-check.yml
-----
-
-. Edit the file and complete all the TODO tasks:
-+
-[source,role="execute"]
-----
-vi /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/my-pre-patch-check.yml
-----
+. Open `lab/playbooks/contain/pre-patch-check.yml` in Gitea, click the pencil icon to edit, and complete all the TODO tasks described in the exercise skeleton.
 +
 [TIP]
 ====
@@ -109,20 +86,9 @@ The key steps are:
 . Use `ansible.builtin.fail` with `when: not _opa_response.json.result.allow_patch` to enforce the policy
 ====
 
-. Test your playbook:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/contain/my-pre-patch-check.yml -i inventory/workshop.yml
-----
+. Commit your changes in Gitea, then sync the project in AAP Controller (*Resources → Projects → DCC Workshop → Sync*). Test by launching the *CONTAIN - Pre-Patch Check* job template.
 
-. If you get stuck, the solution is available:
-+
-[source,role="execute"]
-----
-cat /var/lib/awx/projects/defend-contain-comply/lab/playbooks/contain/pre-patch-check.yml
-----
+. If you get stuck, the solution is in Gitea at `lab/playbooks/contain/pre-patch-check-exercise.yml` — compare the TODO comments with the completed tasks in the solution.
 
 === Verify
 
@@ -246,11 +212,11 @@ This simulates the Change Advisory Board sign-off. In production, this would typ
 
 . Wait for all nodes to complete with green checkmarks.
 
-. Verify from the terminal that the patch was applied:
+. Verify from the terminal that the patch was applied on rhel01:
 +
 [source,role="execute"]
 ----
-rpm -q httpd
+ssh rhel01 rpm -q httpd
 ----
 +
 Expected: `httpd-2.4.62-1.el9` (or newer).
@@ -259,14 +225,14 @@ Expected: `httpd-2.4.62-1.el9` (or newer).
 +
 [source,role="execute"]
 ----
-yum updateinfo list cves 2>/dev/null | grep CVE-2024-38476 || echo "CVE-2024-38476: RESOLVED"
+ssh rhel01 'yum updateinfo list cves 2>/dev/null | grep CVE-2024-38476 || echo "CVE-2024-38476: RESOLVED"'
 ----
 
 . Check that httpd is still running with the patched version:
 +
 [source,role="execute"]
 ----
-sudo systemctl status httpd --no-pager | head -5
+ssh rhel01 sudo systemctl status httpd --no-pager
 ----
 
 === Verify
@@ -285,11 +251,11 @@ sudo systemctl status httpd --no-pager | head -5
 
 The final workflow node generated an HTML compliance report.
 
-. From the terminal, check the report was generated:
+. From the terminal, check the report was generated on rhel01:
 +
 [source,role="execute"]
 ----
-ls -la /tmp/compliance-reports/
+ssh rhel01 ls -la /tmp/compliance-reports/
 ----
 +
 You should see the report file with today's date.
@@ -298,14 +264,14 @@ You should see the report file with today's date.
 +
 [source,role="execute"]
 ----
-cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -A2 "Advisory Applied"
+ssh rhel01 'cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -A2 "Advisory Applied"'
 ----
 
 . Check the package version recorded in the report:
 +
 [source,role="execute"]
 ----
-cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "httpd|CVE|RHSA|SELinux" | head -10
+ssh rhel01 'cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "httpd|CVE|RHSA|SELinux" | head -10'
 ----
 
 . In AAP Controller, go back to **Views → Jobs** and click on the completed **Policy-Gated Patching** workflow job.
@@ -339,18 +305,18 @@ The compliance report contains:
 
 Demonstrate what happens when policy gates fail.
 
-. First, verify the backup marker currently exists:
+. First, verify the backup marker currently exists on rhel01:
 +
 [source,role="execute"]
 ----
-ls -la /var/log/last-backup-timestamp
+ssh rhel01 ls -la /var/log/last-backup-timestamp
 ----
 
 . Remove the backup marker to simulate a stale or missing backup:
 +
 [source,role="execute"]
 ----
-sudo rm -f /var/log/last-backup-timestamp
+ssh rhel01 sudo rm -f /var/log/last-backup-timestamp
 ----
 
 . In AAP Controller, navigate to **Resources → Templates** and launch just the **CONTAIN - Pre-Patch Check** job template (not the workflow — we want to see the policy check in isolation).
@@ -369,16 +335,10 @@ This is the policy working as designed — it prevents patching a system that ha
 +
 [source,role="execute"]
 ----
-sudo touch /var/log/last-backup-timestamp
+ssh rhel01 sudo touch /var/log/last-backup-timestamp
 ----
 
-. Optionally, re-run the pre-patch check to confirm it passes again:
-+
-[source,role="execute"]
-----
-cd /var/lib/awx/projects/defend-contain-comply/lab
-ansible-playbook playbooks/contain/pre-patch-check.yml -i inventory/workshop.yml
-----
+. Optionally, re-run the pre-patch check to confirm it passes again — launch the *CONTAIN - Pre-Patch Check* job template from AAP Controller.
 
 === Verify
 
