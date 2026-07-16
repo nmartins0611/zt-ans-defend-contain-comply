@@ -1,8 +1,8 @@
-# Hardened application container for Meridian Financial
+# Hardened application container for Benekratis Capital
 # Built by AAP Vulnerability Management Workflow
 FROM {{ base_image }}
 
-LABEL maintainer="platform-team@meridian.example.com" \
+LABEL maintainer="platform-team@benekratis.example.com" \
       description="Hardened httpd application - post-remediation" \
       version="{{ container_tag | default('latest') }}" \
       security.remediated="true" \

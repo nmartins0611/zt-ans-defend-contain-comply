@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    container_name: meridian-app
+    container_name: benekratis-app
     container_tag: latest
     registry_url: "localhost:5000"
     verify_after_push: true
@@ -75,7 +75,7 @@
     - name: Verify application content
       ansible.builtin.assert:
         that:
-          - "'Meridian Financial' in _app_health.content"
+          - "'Benekratis Capital' in _app_health.content"
         success_msg: "Application container is serving content correctly."
 
     - name: Remove verification container

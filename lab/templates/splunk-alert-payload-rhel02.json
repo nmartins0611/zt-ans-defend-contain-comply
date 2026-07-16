@@ -19,7 +19,7 @@
   "detection_method": "Splunk Enterprise Security - Vulnerability Correlation",
   "splunk_search": "index=main sourcetype=linux_secure cve=\"CVE-2024-38476\" host=\"app-server-2\"",
   "timestamp": "2024-08-15T15:47:00Z",
-  "organization": "Meridian Financial",
+  "organization": "Benekratis Capital",
   "environment": "production",
   "asset_criticality": "high",
   "compliance_frameworks": [
