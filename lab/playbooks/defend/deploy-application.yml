@@ -147,6 +147,10 @@
         dest: /etc/yum.repos.d/dcc-errata.repo
         mode: "0644"
 
+    - name: Clean dnf metadata to pick up errata repo updateinfo
+      ansible.builtin.command: dnf clean metadata
+      changed_when: true
+
     - name: Verify errata repo is reachable
       ansible.builtin.command: dnf repolist dcc-errata
       register: _repolist
