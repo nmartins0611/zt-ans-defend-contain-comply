@@ -67,29 +67,29 @@
         inventory: "{{ workshop_inventory_name }}"
         state: present
 
-    - name: Add app-server host
+    - name: Add rhel01 host
       ansible.controller.host:
-        name: app-server
+        name: rhel01
         inventory: "{{ workshop_inventory_name }}"
         variables:
           ansible_host: "{{ app_server_ip | default('rhel01') }}"
         state: present
 
-    - name: Add app-server-2 host
+    - name: Add rhel02 host
       ansible.controller.host:
-        name: app-server-2
+        name: rhel02
         inventory: "{{ workshop_inventory_name }}"
         variables:
           ansible_host: "{{ app_server_2_ip | default('rhel02') }}"
         state: present
 
-    - name: Add app-server to appservers group
+    - name: Add hosts to appservers group
       ansible.controller.group:
         name: appservers
         inventory: "{{ workshop_inventory_name }}"
         hosts:
-          - app-server
-          - app-server-2
+          - rhel01
+          - rhel02
         preserve_existing_hosts: true
         state: present
 
@@ -307,19 +307,19 @@
     - name: Link Vulnerability Containment workflow -- scan to contain
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Vulnerability Containment"
-        identifier: contain
+        identifier: scan
         organization: "{{ workshop_org }}"
         success_nodes:
-          - scan
+          - contain
         state: present
 
     - name: Link Vulnerability Containment workflow -- contain to harden
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Vulnerability Containment"
-        identifier: harden
+        identifier: contain
         organization: "{{ workshop_org }}"
         success_nodes:
-          - contain
+          - harden
         state: present
 
     # ── Workflow: Policy-Gated Patching (attendees build this in the UI) ─
@@ -366,19 +366,7 @@
     - name: Link patching workflow -- precheck to approval
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Policy-Gated Patching"
-        identifier: approval
-        organization: "{{ workshop_org }}"
-        success_nodes:
-          - precheck
-        state: present
-      tags:
-        - patching_workflow
-        - never
-
-    - name: Link patching workflow -- approval to patch
-      ansible.controller.workflow_job_template_node:
-        workflow_job_template: "Policy-Gated Patching"
-        identifier: patch
+        identifier: precheck
         organization: "{{ workshop_org }}"
         success_nodes:
           - approval
@@ -387,10 +375,10 @@
         - patching_workflow
         - never
 
-    - name: Link patching workflow -- patch to verify
+    - name: Link patching workflow -- approval to patch
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Policy-Gated Patching"
-        identifier: verify
+        identifier: approval
         organization: "{{ workshop_org }}"
         success_nodes:
           - patch
@@ -399,13 +387,25 @@
         - patching_workflow
         - never
 
-    - name: Link patching workflow -- verify to report
+    - name: Link patching workflow -- patch to verify
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Policy-Gated Patching"
-        identifier: report
+        identifier: patch
         organization: "{{ workshop_org }}"
         success_nodes:
           - verify
+        state: present
+      tags:
+        - patching_workflow
+        - never
+
+    - name: Link patching workflow -- verify to report
+      ansible.controller.workflow_job_template_node:
+        workflow_job_template: "Policy-Gated Patching"
+        identifier: verify
+        organization: "{{ workshop_org }}"
+        success_nodes:
+          - report
         state: present
       tags:
         - patching_workflow
@@ -439,55 +439,55 @@
     - name: Link Compliance workflow -- audit_pre to harden
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Compliance and Hardening"
-        identifier: harden
-        organization: "{{ workshop_org }}"
-        success_nodes:
-          - audit_pre
-        state: present
-
-    - name: Link Compliance workflow -- harden to audit_post
-      ansible.controller.workflow_job_template_node:
-        workflow_job_template: "Compliance and Hardening"
-        identifier: audit_post
+        identifier: audit_pre
         organization: "{{ workshop_org }}"
         success_nodes:
           - harden
         state: present
 
-    - name: Link Compliance workflow -- audit_post to report
+    - name: Link Compliance workflow -- harden to audit_post
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Compliance and Hardening"
-        identifier: report
+        identifier: harden
         organization: "{{ workshop_org }}"
         success_nodes:
           - audit_post
         state: present
 
-    - name: Link Compliance workflow -- report to build
+    - name: Link Compliance workflow -- audit_post to report
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Compliance and Hardening"
-        identifier: build
+        identifier: audit_post
         organization: "{{ workshop_org }}"
         success_nodes:
           - report
         state: present
 
-    - name: Link Compliance workflow -- build to scan
+    - name: Link Compliance workflow -- report to build
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Compliance and Hardening"
-        identifier: scan
+        identifier: report
         organization: "{{ workshop_org }}"
         success_nodes:
           - build
         state: present
 
-    - name: Link Compliance workflow -- scan to push
+    - name: Link Compliance workflow -- build to scan
       ansible.controller.workflow_job_template_node:
         workflow_job_template: "Compliance and Hardening"
-        identifier: push
+        identifier: build
         organization: "{{ workshop_org }}"
         success_nodes:
           - scan
+        state: present
+
+    - name: Link Compliance workflow -- scan to push
+      ansible.controller.workflow_job_template_node:
+        workflow_job_template: "Compliance and Hardening"
+        identifier: scan
+        organization: "{{ workshop_org }}"
+        success_nodes:
+          - push
         state: present
 
     # ── Verification ───────────────────────────────────────────────────

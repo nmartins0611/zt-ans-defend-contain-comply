@@ -5,7 +5,7 @@
   "cve_id": "CVE-2024-38476",
   "title": "Apache HTTP Server SSRF via mod_rewrite",
   "description": "Apache HTTP Server versions 2.4.59 and earlier are vulnerable to SSRF in mod_rewrite configurations that allow unsafe RewriteRules.",
-  "host": "app-server",
+  "host": "rhel01",
   "host_ip": "192.168.1.100",
   "service": "httpd",
   "port": 443,

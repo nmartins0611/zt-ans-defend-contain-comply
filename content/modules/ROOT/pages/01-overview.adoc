@@ -101,13 +101,13 @@ Your lab consists of:
 | EDA Controller — rulebook activations
 | Web UI tab
 
-| `app-server`
+| `rhel01`
 | RHEL 9 target with httpd (vulnerable package pre-staged)
 | Terminal tab (SSH)
 
 | `localhost:5000`
 | Container registry (Podman-based)
-| Available from app-server
+| Available from rhel01
 |===
 
 == Credentials
