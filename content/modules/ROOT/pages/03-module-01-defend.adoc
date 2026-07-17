@@ -283,7 +283,7 @@ You should see a cron entry running AIDE checks every 4 hours.
 +
 [source,role="execute"]
 ----
-cat /var/log/containment-actions.log
+sudo cat /var/log/containment-actions.log
 ----
 
 ==== Verify
@@ -320,12 +320,12 @@ When the Splunk saved search detects CVE events, the **Event-Driven Ansible Add-
 
 . Create a new file and add the following path to the repository `/extensions/eda/rulebooks/splunk-cve-alert.yml`, add the following yaml content:
 
+---
 - name: Respond to Splunk CVE alerts
   hosts: all
   sources:
     - ansible.eda.pg_listener:
         token: "{{ EDA_WEBHOOK_TOKEN | default('') }}"
-
   rules:
     - name: CVE alert from Splunk - trigger containment
       condition: event.payload.search_name is search("CVE Alert")
@@ -340,6 +340,7 @@ When the Splunk saved search detects CVE events, the **Event-Driven Ansible Add-
               affected_host: "{{ event.payload.results.host }}"
               alert_source: "splunk"
 
+
 +
 [TIP]
 ====
@@ -350,11 +351,8 @@ The Splunk add-on sends the saved search name in `event.payload.search_name`. Us
 
 . Commit your changes in Gitea, then sync the EDA project in AAP Controller (*Automation Decisions → Projects → Defend, Contain, Comply → Sync*).
 
-==== Verify
 
-Your rulebook has a rule that matches on the Splunk saved search name and triggers the containment workflow scoped to the affected host.
-
-=== Exercise 5: Connect Splunk to EDA Controller
+=== Exercise 5: Connect Splunk to EDA
 
 [NOTE.why]
 ====
@@ -363,35 +361,47 @@ Your rulebook has a rule that matches on the Splunk saved search name and trigge
 
 The AAP credential, project, and decision environment are already configured. You need to create an **Event Stream** in Event-Driven Ansible, configure the **Splunk add-on** to point at it, and create the **Rulebook Activation**.
 
-. Open the **Automation Decisions** and navigate to ****.
-
-. Open the **Automation Decisions** and navigate to **Event Streams**.
-
-. Click **Create event stream**:
+. Open the **Automation Decisions** and navigate to **Infrastructure → Credentials**. We need to create a token credential to be used by the Event Stream. Click on **Create credential**:
 +
-* Name: `DCC Splunk Events`
-* Credential Type: `Token`
-* Click **Create event stream**
+* Name: `Splunk EDA Token`
+* Description: `Token for Splunk EDA`
+* Organization: `Default`
+* Credential Type: `Token Event Stream`
+* Token: `ansibleiscool`
+* HTTP Header Key: `Authorization`
+* Click **Create credential**
 
-. Copy the **Event Stream URL** and **Token** that are displayed — you will need these for the Splunk configuration.
 
-. Open the **Splunk** tab and navigate to **Apps → Ansible Add-on for Splunk → Configuration**.
-
-. Click **Create New Environment**:
+. Open the **Event Streams** section and click **Create event stream**:
 +
-* Environment Name: `DCC`
+* Name: `Splunk EDA`
+* Organization: `Default`
+* Event stream type: `Token Event Stream`
+* Credential: `Splunk EDA Token`
+* Click **Create credential**
+
+. We now have an Event Stream created, but we need to configure the Splunk add-on to point at it. You will need to copy the Event Stream URL and the Token from the Event Stream you created.
+
+
+. Open the **Splunk** tab and navigate to **Apps → Event Driven Ansible Add-on for Splunk → Configuration**.
+
+. Click **Add**:
++
+* Name: `Splunk2EDA`
+* Environment: `DCC`
 * Integration Type: `Webhook`
-* Webhook Endpoint: paste the Event Stream URL from step 3
+* Webhook Endpoint: paste the Event Stream URL from step 3. Please note you need to remove aap.example.org from the URL due to the workshop environment, use 192.168.1.10 instead. EG: https://192.168.1.10:443/eda-event-streams/api/eda/v1/external_event_stream/bf6e8ea1-fb1e-4a54-aae0-d0a7f9f27327/post/
 * Auth Type: `API Key`
-* Token: paste the Token from step 3
+* Token: ansibleiscool
 * SSL Check Hostname: `No` (lab environment uses self-signed certificates)
 * Click **Save**
 
-. Back in **EDA Controller**, navigate to **Rulebook Activations** and click **Create rulebook activation**:
+
+. Navigate back to **AAP Controller**, navigate to **Automation Decisions → Rulebook Activations** and click **Create rulebook activation**:
 +
 * Name: `DCC CVE Alert Responder`
 * Project: `Defend, Contain, Comply` (pre-configured)
-* Rulebook: select `lab/extensions/eda/my-splunk-cve-alert.yml` (or `splunk-cve-alert.yml` if using the solution)
+* Rulebook: select `splunk-cve-alert.yml` 
 * Decision Environment: select the default (pre-configured)
 * Credential: `DCC Controller Token` (pre-configured)
 * Event stream: `DCC Splunk Events`
@@ -399,11 +409,8 @@ The AAP credential, project, and decision environment are already configured. Yo
 
 . Wait for the activation status to show **Running**.
 
-==== Verify
+. Navigate to **Automation Execution → Templates**, and edit **Vulnerability Containment** by selecting **Prompt on launch** for **Extra Variables** and save the workflow.
 
-* The Token Event Stream `DCC Splunk Events` exists in EDA Controller
-* The Splunk add-on has a `DCC` environment configured with the correct event stream URL
-* The rulebook activation is **Running**
 
 === Exercise 6: Deploy the Application to rhel02
 
