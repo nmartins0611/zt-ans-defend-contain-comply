@@ -39,7 +39,7 @@ Your security team has flagged unusual activity. Start by investigating what Spl
 . Open the **Splunk** tab and log in:
 +
 * Username: `admin`
-* Password: `{aap_admin_password}`
+* Password: `ansible123!`
 
 . Navigate to **Search & Reporting** from the left sidebar.
 
@@ -89,7 +89,7 @@ Splunk shows the detection, but you need to confirm the CVE actually exists on t
 . Open the **AAP Controller** tab and log in:
 +
 * Username: `admin`
-* Password: `{aap_admin_password}`
+* Password: `ansible123!`
 
 . Navigate to **Resources → Templates** and find the **DEFEND - Scan System** job template.
 
@@ -129,11 +129,19 @@ In production, your containment level depends on how actively the CVE is being e
 
 Before running the containment workflow, capture the current state so you can see exactly what changes.
 
+. Open the **Terminal** tab and connect to `rhel01`:
++
+[source,role="execute"]
+----
+ssh rhel01
+----
+. When asked for a password, enter `ansible123!`
+
 . Check which firewall zone each network interface is in:
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --get-active-zones
 ----
 +
 Both `eth0` and `eth1` should be in the `public` zone.
@@ -142,7 +150,7 @@ Both `eth0` and `eth1` should be in the `public` zone.
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo firewall-cmd --zone=public --list-all
+sudo firewall-cmd --zone=public --list-all
 ----
 +
 You should see `http`, `https`, `ssh`, and other services listed — the system is wide open.
@@ -151,14 +159,14 @@ You should see `http`, `https`, `ssh`, and other services listed — the system 
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo systemctl status httpd --no-pager | head -5
+sudo systemctl status httpd --no-pager | head -5
 ----
 
 . Verify the portal responds:
 +
 [source,role="execute"]
 ----
-ssh rhel01 curl -so /dev/null -w "HTTP %{http_code}\n" http://localhost
+curl -so /dev/null -w "HTTP %{http_code}\n" http://localhost
 ----
 +
 Expected: `HTTP 200`.
@@ -169,7 +177,12 @@ NOTE: Keep this baseline in mind — after the workflow runs, every one of these
 
 ==== Run the containment workflow
 
-. In AAP Controller, navigate to **Resources → Templates** and find the **Vulnerability Containment** workflow template.
+. In AAP Controller, you need to login with the following details:
+
+* Username: `admin`
+* Password: `ansible123!`
+
+. Navigate to **Automation Execution → Templates** and find the **Vulnerability Containment** workflow template.
 
 . Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `rhel01`.
 
@@ -189,7 +202,7 @@ NOTE: Keep this baseline in mind — after the workflow runs, every one of these
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --get-active-zones
 ----
 +
 `eth0` should now be in the `internal-only` zone (SSH only). `eth1` remains in the `public` zone.
@@ -198,7 +211,7 @@ ssh rhel01 sudo firewall-cmd --get-active-zones
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo firewall-cmd --zone=public --list-services
+sudo firewall-cmd --zone=public --list-services
 ----
 +
 Neither `http` nor `https` should appear — only `ssh`, `cockpit`, and `dhcpv6-client`.
@@ -207,7 +220,7 @@ Neither `http` nor `https` should appear — only `ssh`, `cockpit`, and `dhcpv6-
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo firewall-cmd --zone=internal-only --list-all
+sudo firewall-cmd --zone=internal-only --list-all
 ----
 +
 You should see `eth0` assigned with only `ssh` allowed — external traffic is blocked.
@@ -216,7 +229,7 @@ You should see `eth0` assigned with only `ssh` allowed — external traffic is b
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo systemctl status httpd --no-pager | head -5
+sudo systemctl status httpd --no-pager | head -5
 ----
 +
 Expected: `active (running)`.
@@ -234,7 +247,7 @@ Expected: `HTTP 200` — the service is contained from external access but still
 +
 [source,role="execute"]
 ----
-ssh rhel01 grep -E "^ServerTokens|^ServerSignature" /etc/httpd/conf/httpd.conf
+grep -E "^ServerTokens|^ServerSignature" /etc/httpd/conf/httpd.conf
 ----
 +
 Expected: `ServerTokens Prod` and `ServerSignature Off`.
@@ -243,7 +256,7 @@ Expected: `ServerTokens Prod` and `ServerSignature Off`.
 +
 [source,role="execute"]
 ----
-ssh rhel01 curl -sI http://localhost | grep -iE "X-Content-Type|X-Frame|Content-Security|Referrer-Policy|Server:"
+curl -sI http://localhost | grep -iE "X-Content-Type|X-Frame|Content-Security|Referrer-Policy|Server:"
 ----
 +
 You should see the containment headers and the `Server:` header showing only `Apache` (no version).
@@ -252,7 +265,7 @@ You should see the containment headers and the `Server:` header showing only `Ap
 +
 [source,role="execute"]
 ----
-ssh rhel01 getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail httpd_use_nfs
+getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail httpd_use_nfs
 ----
 +
 All four should show `off`.
@@ -261,7 +274,7 @@ All four should show `off`.
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo crontab -l | grep aide
+sudo crontab -l | grep aide
 ----
 +
 You should see a cron entry running AIDE checks every 4 hours.
@@ -270,7 +283,7 @@ You should see a cron entry running AIDE checks every 4 hours.
 +
 [source,role="execute"]
 ----
-ssh rhel01 cat /var/log/containment-actions.log
+cat /var/log/containment-actions.log
 ----
 
 ==== Verify
@@ -296,18 +309,37 @@ ssh rhel01 cat /var/log/containment-actions.log
 *Why we do this:* Event-Driven Ansible needs rules that map incoming alert data to the right automated response. The rulebook is the decision logic: which alerts warrant full containment, which need investigation only, and which trigger patching. Writing these rules forces you to think about your organization's response policy in code — what severity triggers what action, and what data from the alert flows through to the automation.
 ====
 
-When the Splunk saved search detects CVE events, the **Ansible Add-on for Splunk** sends a webhook to EDA. You need a rulebook that matches these events and triggers the right workflow.
+When the Splunk saved search detects CVE events, the **Event-Driven Ansible Add-on for Splunk** sends a webhook to EDA. You need a rulebook that matches these events and triggers the right workflow.
 
-. First, understand the payload that Splunk's add-on sends to EDA. The key fields are:
+. Navigate to Gitea and login with the following details:
 +
-* `event.payload.search_name` — the saved search name (e.g. `"DCC CVE Alert"`)
-* `event.payload.results.host` — the affected host from search results
-* `event.payload.results.count` — number of matches
-* `event.payload.app` — `"ansible_addon_for_splunk"`
+* Username: `gitea`
+* Password: `ansible123!`
 
-. In the *Gitea* tab, navigate to `lab/extensions/eda/splunk-cve-alert-exercise.yml` and read through the exercise skeleton.
+. In the *Gitea* , click on explore and navigate to the repository `defend-contain-comply`.
 
-. Open `lab/extensions/eda/splunk-cve-alert.yml` in Gitea, click the pencil icon to edit, and complete the rule using the hints from the exercise skeleton.
+. Create a new file and add the following path to the repository `/extensions/eda/rulebooks/splunk-cve-alert.yml`, add the following yaml content:
+
+- name: Respond to Splunk CVE alerts
+  hosts: all
+  sources:
+    - ansible.eda.pg_listener:
+        token: "{{ EDA_WEBHOOK_TOKEN | default('') }}"
+
+  rules:
+    - name: CVE alert from Splunk - trigger containment
+      condition: event.payload.search_name is search("CVE Alert")
+      actions:
+        - run_workflow_template:
+            name: "Vulnerability Containment"
+            organization: Default
+            job_args:
+              limit: "{{ event.payload.results.host }}"
+            extra_vars:
+              target_cve: "CVE-2024-38476"
+              affected_host: "{{ event.payload.results.host }}"
+              alert_source: "splunk"
+
 +
 [TIP]
 ====
@@ -316,9 +348,7 @@ The Splunk add-on sends the saved search name in `event.payload.search_name`. Us
 *Rule 1* (CVE alert from Splunk): Match `event.payload.search_name is search("CVE Alert")`. Use `run_workflow_template` to trigger "Vulnerability Containment" with `job_args.limit` set to `event.payload.results.host`.
 ====
 
-. If you get stuck, the complete solution is in Gitea at `lab/extensions/eda/splunk-cve-alert-exercise.yml` — compare the TODO comments with the completed tasks in the solution.
-
-. Commit your changes in Gitea, then sync the EDA project in EDA Controller (*Projects → Defend, Contain, Comply → Sync*).
+. Commit your changes in Gitea, then sync the EDA project in AAP Controller (*Automation Decisions → Projects → Defend, Contain, Comply → Sync*).
 
 ==== Verify
 
@@ -331,9 +361,11 @@ Your rulebook has a rule that matches on the Splunk saved search name and trigge
 *Why we do this:* The EDA Token Event Stream is the secure ingestion point for external systems. By creating the event stream in AAP and configuring the Splunk add-on to point at it, you're building a trusted channel between your SIEM and your automation platform. The API key authentication ensures only authorized sources can trigger automation. This is the wiring that turns a detection tool into a response system.
 ====
 
-The EDA credential, project, and decision environment are already configured. You need to create a **Token Event Stream** in EDA, configure the **Splunk add-on** to point at it, and create the **Rulebook Activation**.
+The AAP credential, project, and decision environment are already configured. You need to create an **Event Stream** in Event-Driven Ansible, configure the **Splunk add-on** to point at it, and create the **Rulebook Activation**.
 
-. Open the **EDA Controller** tab and navigate to **Event Streams**.
+. Open the **Automation Decisions** and navigate to ****.
+
+. Open the **Automation Decisions** and navigate to **Event Streams**.
 
 . Click **Create event stream**:
 +
