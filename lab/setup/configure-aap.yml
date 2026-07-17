@@ -19,6 +19,25 @@
       validate_certs: false
 
   tasks:
+    # ── Users ────────────────────────────────────────────────────────────
+    - name: Create security_engineer user
+      ansible.controller.user:
+        username: security_engineer
+        password: "{{ aap_password }}"
+        first_name: Security
+        last_name: Engineer
+        email: security_engineer@benekratis.example.com
+        is_superuser: false
+        state: present
+
+    - name: Grant security_engineer execute role on Default organization
+      ansible.controller.role:
+        user: security_engineer
+        role: execute
+        organizations:
+          - "{{ workshop_org }}"
+        state: present
+
     # ── Credential ─────────────────────────────────────────────────────
     - name: Create machine credential for app server
       ansible.controller.credential:
