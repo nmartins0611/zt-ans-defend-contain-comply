@@ -55,7 +55,7 @@ zt-ans-defend-contain-comply/
 │       └── configure-control.yml  # Wait for AAP, OAuth token, run AAP/app config
 ├── lab/                           # Workshop content (playbooks, setup, exercises)
 │   ├── playbooks/                 # Exercise playbooks (defend/, contain/, comply/)
-│   ├── setup/                     # AAP/EDA/app-server configure playbooks
+│   ├── setup/                     # AAP/EDA/rhel01 configure playbooks
 │   ├── inventory/                 # workshop.yml
 │   ├── templates/                 # Containerfile, compliance reports, Splunk payload
 │   ├── rulebooks/                 # EDA rulebooks (solution + exercise skeleton)

@@ -60,6 +60,72 @@ You should have:
 
 **The opportunity**: Ansible Automation Platform can address all four challenges across three integrated modules — Defend, Contain, Comply — and you're going to prove it today.
 
+== Timing
+
+[cols="1,3,1",options="header"]
+|===
+| Module | Topic | Duration
+
+| 1
+| **DEFEND** — Detect CVE via Splunk/EDA, automate containment and hardening
+| ~40 min
+
+| 2
+| **CONTAIN** — OPA policy-gated patching workflow with compliance verification
+| ~40 min
+
+| 3
+| **COMPLY** — Compliance audit, CIS hardening, evidence generation, container build and delivery
+| ~45 min
+
+| —
+| Wrap-up and Q&A
+| ~10 min
+|===
+
+Total: **{lab_duration}** depending on pace and discussion.
+
+== Environment details
+
+Your lab consists of:
+
+[cols="1,2,2",options="header"]
+|===
+| Host | Role | Access
+
+| `aap-controller`
+| AAP Controller 2.5 — workflow orchestration
+| Web UI tab
+
+| `eda-controller`
+| EDA Controller — rulebook activations
+| Web UI tab
+
+| `rhel01`
+| RHEL 9 target with httpd (vulnerable package pre-staged)
+| Terminal tab (SSH)
+
+| `localhost:5000`
+| Container registry (Podman-based)
+| Available from rhel01
+|===
+
+== Credentials
+
+[cols="1,2",options="header"]
+|===
+| Credential | Value
+
+| AAP Controller admin
+| `admin` / `{aap_admin_password}`
+
+| EDA Controller admin
+| `admin` / `{eda_admin_password}`
+
+| App server SSH
+| `lab-user` (passwordless sudo)
+|===
+
 == Next steps
 
-Proceed to xref:02-details.adoc[Workshop Details] for environment setup and timing.
+Begin with xref:03-module-01-defend.adoc[Module 1: DEFEND — Detect and Contain].

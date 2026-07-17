@@ -93,7 +93,7 @@ Splunk shows the detection, but you need to confirm the CVE actually exists on t
 
 . Navigate to **Resources → Templates** and find the **DEFEND - Scan System** job template.
 
-. Click the rocket icon to **Launch** the job template. When prompted for a **Limit**, enter `app-server` to target only rhel01.
+. Click the rocket icon to **Launch** the job template. When prompted for a **Limit**, enter `rhel01` to target only rhel01.
 
 . Watch the job output. You should see:
 +
@@ -171,7 +171,7 @@ NOTE: Keep this baseline in mind — after the workflow runs, every one of these
 
 . In AAP Controller, navigate to **Resources → Templates** and find the **Vulnerability Containment** workflow template.
 
-. Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `app-server`.
+. Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `rhel01`.
 
 . Watch the workflow execute three steps in sequence:
 +
@@ -384,7 +384,7 @@ Now deploy the same vulnerable application to a second server.
 
 . In AAP Controller, navigate to **Resources → Templates** and find the **DEFEND - Deploy Application** job template.
 
-. Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `app-server-2` to target only rhel02.
+. Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `rhel02` to target only rhel02.
 
 . Wait for the job to complete. It deploys the vulnerable httpd, the Benekratis Capital portal, and configures the errata repository.
 
@@ -397,7 +397,7 @@ Now deploy the same vulnerable application to a second server.
 index=main sourcetype=linux_secure "CVE-2024-38476" | stats count by host, source | where count > 0
 ----
 +
-You should now see events for **both** `rhel01` and `app-server-2`.
+You should now see events for **both** `rhel01` and `rhel02`.
 
 ==== Verify
 
@@ -414,7 +414,7 @@ You should now see events for **both** `rhel01` and `app-server-2`.
 
 Everything is in place: EDA is running, rhel02 has the vulnerable app, and Splunk has detection events. Now run a scan to trigger the full detection-to-containment chain.
 
-. In AAP Controller, navigate to **Resources → Templates** and launch the **DEFEND - Scan System** job template. When prompted for a **Limit**, enter `app-server-2`.
+. In AAP Controller, navigate to **Resources → Templates** and launch the **DEFEND - Scan System** job template. When prompted for a **Limit**, enter `rhel02`.
 +
 The scan will detect {target_cve} on rhel02 and report the finding to Splunk via HEC.
 
@@ -429,7 +429,7 @@ If you don't want to wait for the cron cycle, you can trigger the saved search m
 
 . Switch to the **EDA Controller** tab — you should see the event received and your rule matched in the rulebook activation history.
 
-. Switch to the **AAP Controller** tab and navigate to **Views → Jobs** — the **Vulnerability Containment** workflow should be launching automatically, limited to `app-server-2`.
+. Switch to the **AAP Controller** tab and navigate to **Views → Jobs** — the **Vulnerability Containment** workflow should be launching automatically, limited to `rhel02`.
 
 . Watch the workflow complete. Then click the **Portal - rhel02** tab and refresh — the portal should **no longer be accessible**.
 
@@ -476,7 +476,7 @@ Both hosts should show identical containment posture — external interface isol
 
 * The DEFEND - Scan System job detected the CVE and reported it to Splunk
 * Splunk's saved search fired and the EDA add-on delivered the event
-* EDA matched the rule and triggered the Vulnerability Containment workflow against `app-server-2`
+* EDA matched the rule and triggered the Vulnerability Containment workflow against `rhel02`
 * The Benekratis Capital Portal on rhel02 is **no longer publicly accessible**
 * Both servers show identical containment: firewall, hardening, SELinux, and security headers
 * rhel01 was contained manually in minutes; rhel02 was contained automatically in seconds

@@ -3,7 +3,7 @@ all:
   children:
     appservers:
       hosts:
-        app-server:
+        rhel01:
           ansible_host: "{{ app_server_ip | default('rhel01') }}"
           ansible_user: rhel
       vars:

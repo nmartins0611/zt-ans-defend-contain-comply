@@ -5,7 +5,7 @@
   "cve_id": "CVE-2024-38476",
   "title": "Apache HTTP Server SSRF via mod_rewrite",
   "description": "Apache HTTP Server versions 2.4.59 and earlier are vulnerable to SSRF in mod_rewrite configurations that allow unsafe RewriteRules.",
-  "host": "app-server-2",
+  "host": "rhel02",
   "host_ip": "192.168.1.14",
   "service": "httpd",
   "port": 443,
@@ -17,7 +17,7 @@
     "httpd-2.4.57-5.el9"
   ],
   "detection_method": "Splunk Enterprise Security - Vulnerability Correlation",
-  "splunk_search": "index=main sourcetype=linux_secure cve=\"CVE-2024-38476\" host=\"app-server-2\"",
+  "splunk_search": "index=main sourcetype=linux_secure cve=\"CVE-2024-38476\" host=\"rhel02\"",
   "timestamp": "2024-08-15T15:47:00Z",
   "organization": "Benekratis Capital",
   "environment": "production",
