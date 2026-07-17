@@ -1,0 +1,115 @@
+---
+- name: Verify security posture across contained hosts
+  hosts: appservers
+  gather_facts: true
+  become: true
+
+  vars:
+    target_service: httpd
+    containment_zone: internal-only
+
+  tasks:
+    - name: Check service state
+      ansible.builtin.systemd:
+        name: "{{ target_service }}"
+      register: _service_state
+      failed_when: false
+      changed_when: false
+
+    - name: Get active firewall zones
+      ansible.builtin.command: firewall-cmd --get-active-zones
+      register: _active_zones
+      changed_when: false
+      failed_when: false
+
+    - name: Get containment zone details
+      ansible.builtin.command: "firewall-cmd --zone={{ containment_zone }} --list-all"
+      register: _containment_zone
+      changed_when: false
+      failed_when: false
+
+    - name: Get public zone services
+      ansible.builtin.command: firewall-cmd --zone=public --list-services
+      register: _public_services
+      changed_when: false
+      failed_when: false
+
+    - name: Check internal HTTP access
+      ansible.builtin.uri:
+        url: "http://localhost"
+        method: GET
+        status_code: [200, -1]
+        timeout: 5
+      register: _internal_http
+      failed_when: false
+
+    - name: Get SELinux booleans
+      ansible.builtin.command: getsebool httpd_can_network_connect httpd_enable_cgi httpd_can_sendmail httpd_use_nfs
+      register: _selinux_bools
+      changed_when: false
+      failed_when: false
+
+    - name: Get httpd hardening state
+      ansible.builtin.command: grep -E "^ServerTokens|^ServerSignature" /etc/httpd/conf/httpd.conf
+      register: _httpd_hardening
+      changed_when: false
+      failed_when: false
+
+    - name: Check AIDE cron
+      ansible.builtin.command: crontab -l
+      register: _aide_cron
+      changed_when: false
+      failed_when: false
+
+    - name: Read containment log
+      ansible.builtin.command: cat /var/log/containment-actions.log
+      register: _containment_log
+      changed_when: false
+      failed_when: false
+
+    - name: Display security posture report
+      ansible.builtin.debug:
+        msg: |
+          ══════════════════════════════════════════════════════
+          SECURITY POSTURE: {{ inventory_hostname }}
+          ══════════════════════════════════════════════════════
+
+          ── Service State ──────────────────────────────────
+          {{ target_service }}: {{ _service_state.status.ActiveState | default('not installed') }}
+
+          ── Firewall Zones ─────────────────────────────────
+          {{ _active_zones.stdout }}
+
+          ── Containment Zone ({{ containment_zone }}) ──────
+          {{ _containment_zone.stdout | default('zone not found') }}
+
+          ── Public Zone Services ───────────────────────────
+          {{ _public_services.stdout }}
+
+          ── Internal HTTP Access ──────────────────────────
+          http://localhost → HTTP {{ _internal_http.status | default('unreachable') }}
+
+          ── SELinux Booleans ───────────────────────────────
+          {{ _selinux_bools.stdout | default('not available') }}
+
+          ── httpd Hardening ────────────────────────────────
+          {{ _httpd_hardening.stdout | default('not hardened') }}
+
+          ── AIDE Monitoring ────────────────────────────────
+          {{ 'ACTIVE' if 'aide' in (_aide_cron.stdout | default('')) else 'NOT CONFIGURED' }}
+
+          ── Containment Log ────────────────────────────────
+          {{ _containment_log.stdout | default('no containment actions recorded') }}
+          ══════════════════════════════════════════════════════
+
+    - name: Export posture summary via set_stats
+      ansible.builtin.set_stats:
+        data:
+          security_posture:
+            host: "{{ inventory_hostname }}"
+            service_state: "{{ _service_state.status.ActiveState | default('unknown') }}"
+            eth0_isolated: "{{ containment_zone in (_active_zones.stdout | default('')) }}"
+            http_in_public: "{{ 'http' in (_public_services.stdout | default('')) }}"
+            internal_access: "{{ _internal_http.status | default(0) }}"
+            selinux_hardened: "{{ 'off' in (_selinux_bools.stdout | default('')) }}"
+            aide_active: "{{ 'aide' in (_aide_cron.stdout | default('')) }}"
