@@ -3,6 +3,10 @@ package dcc.patch_policy
 import rego.v1
 
 default allow_patch := false
+default maintenance_window_ok := false
+default backup_current := false
+default disk_space_ok := false
+default service_healthy := false
 
 maintenance_window_ok if {
 	hour := input.current_hour
