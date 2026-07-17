@@ -421,7 +421,7 @@ The AAP credential, project, and decision environment are already configured. Yo
 
 Now deploy the same vulnerable application to a second server.
 
-. In AAP Controller, navigate to **Resources → Templates** and find the **DEFEND - Deploy Application** job template.
+. In AAP Controller, navigate to **Automation Execution → Templates** and find the **DEFEND - Deploy Application** job template.
 
 . Click the rocket icon to **Launch**. When prompted for a **Limit**, enter `rhel02` to target only rhel02.
 

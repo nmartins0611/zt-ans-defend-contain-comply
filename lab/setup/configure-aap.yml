@@ -290,6 +290,7 @@
         organization: "{{ workshop_org }}"
         inventory: "{{ workshop_inventory_name }}"
         ask_limit_on_launch: true
+        ask_variables_on_launch: true
         state: present
 
     - name: Build Vulnerability Containment workflow nodes
