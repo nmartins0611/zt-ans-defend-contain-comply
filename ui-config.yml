@@ -9,9 +9,6 @@ antora:
     - name: 01-overview
       label: "Workshop Overview"
       solveButton: false
-    - name: 02-details
-      label: "Workshop Details"
-      solveButton: false
     - name: 03-module-01-defend
       label: "DEFEND: Detect and Contain"
       solveButton: false
