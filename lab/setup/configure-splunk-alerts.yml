@@ -101,7 +101,7 @@
           [DCC CVE Alert]
           alert.severity = 4
           alert.suppress = 1
-          alert.suppress.period = 600s
+          alert.suppress.period = 120s
           alert.track = 1
           actions = ansible_core
           action.ansible_core = 1
@@ -147,5 +147,5 @@
         msg: >-
           Splunk configured for DCC workshop:
           saved search 'DCC CVE Alert' active (ansible_core action, DCC environment),
-          1-minute cron schedule, 10-minute alert suppression.
+          1-minute cron schedule, 2-minute alert suppression.
           Students configure the DCC environment in the Splunk add-on UI.
