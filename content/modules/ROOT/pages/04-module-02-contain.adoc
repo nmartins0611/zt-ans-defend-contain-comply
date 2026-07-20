@@ -36,7 +36,7 @@ Before writing the playbook, understand the policies that govern patching at Ben
 +
 Note the four automatable gates: maintenance window, backup verification, disk space, and service health. The fifth gate (change approval) is enforced by an AAP approval node.
 
-. Simulate a recent backup on the app server by creating the backup marker:
+. Navigate to **Terminal ** and simulate a recent backup on the app server by creating the backup marker:
 +
 [source,role="execute"]
 ----
