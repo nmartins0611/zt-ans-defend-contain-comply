@@ -43,6 +43,14 @@
       when: _zone_created is changed
       changed_when: true
 
+    - name: Ensure eth0 is in public zone (undo prior containment if any)
+      ansible.posix.firewalld:
+        zone: public
+        interface: eth0
+        permanent: true
+        immediate: true
+        state: enabled
+
     - name: Allow http and https in public zone
       ansible.posix.firewalld:
         service: "{{ item }}"

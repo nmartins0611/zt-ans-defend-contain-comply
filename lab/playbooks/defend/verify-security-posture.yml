@@ -67,40 +67,46 @@
       changed_when: false
       failed_when: false
 
-    - name: Display security posture report
+    # ── Report ────────────────────────────────────────────────────────
+    - name: "POSTURE » {{ inventory_hostname }} » Service State"
       ansible.builtin.debug:
-        msg: |
-          ══════════════════════════════════════════════════════
-          SECURITY POSTURE: {{ inventory_hostname }}
-          ══════════════════════════════════════════════════════
+        msg:
+          - "{{ target_service }}: {{ _service_state.status.ActiveState | default('not installed') }}"
 
-          ── Service State ──────────────────────────────────
-          {{ target_service }}: {{ _service_state.status.ActiveState | default('not installed') }}
+    - name: "POSTURE » {{ inventory_hostname }} » Firewall Zones"
+      ansible.builtin.debug:
+        msg: "{{ _active_zones.stdout_lines | default(['no active zones']) }}"
 
-          ── Firewall Zones ─────────────────────────────────
-          {{ _active_zones.stdout }}
+    - name: "POSTURE » {{ inventory_hostname }} » Containment Zone ({{ containment_zone }})"
+      ansible.builtin.debug:
+        msg: "{{ _containment_zone.stdout_lines | default(['zone not found']) }}"
 
-          ── Containment Zone ({{ containment_zone }}) ──────
-          {{ _containment_zone.stdout | default('zone not found') }}
+    - name: "POSTURE » {{ inventory_hostname }} » Public Zone Services"
+      ansible.builtin.debug:
+        msg:
+          - "{{ _public_services.stdout | default('none') }}"
 
-          ── Public Zone Services ───────────────────────────
-          {{ _public_services.stdout }}
+    - name: "POSTURE » {{ inventory_hostname }} » Internal HTTP Access"
+      ansible.builtin.debug:
+        msg:
+          - "http://localhost → HTTP {{ _internal_http.status | default('unreachable') }}"
 
-          ── Internal HTTP Access ──────────────────────────
-          http://localhost → HTTP {{ _internal_http.status | default('unreachable') }}
+    - name: "POSTURE » {{ inventory_hostname }} » SELinux Booleans"
+      ansible.builtin.debug:
+        msg: "{{ _selinux_bools.stdout_lines | default(['not available']) }}"
 
-          ── SELinux Booleans ───────────────────────────────
-          {{ _selinux_bools.stdout | default('not available') }}
+    - name: "POSTURE » {{ inventory_hostname }} » httpd Hardening"
+      ansible.builtin.debug:
+        msg: "{{ _httpd_hardening.stdout_lines | default(['not hardened']) }}"
 
-          ── httpd Hardening ────────────────────────────────
-          {{ _httpd_hardening.stdout | default('not hardened') }}
+    - name: "POSTURE » {{ inventory_hostname }} » AIDE Monitoring"
+      ansible.builtin.debug:
+        msg:
+          - "{{ 'ACTIVE — cron job configured' if 'aide' in (_aide_cron.stdout | default('')) else 'NOT CONFIGURED' }}"
 
-          ── AIDE Monitoring ────────────────────────────────
-          {{ 'ACTIVE' if 'aide' in (_aide_cron.stdout | default('')) else 'NOT CONFIGURED' }}
-
-          ── Containment Log ────────────────────────────────
-          {{ _containment_log.stdout | default('no containment actions recorded') }}
-          ══════════════════════════════════════════════════════
+    - name: "POSTURE » {{ inventory_hostname }} » Containment Log"
+      ansible.builtin.debug:
+        msg: "{{ _containment_log.stdout_lines | default(['no containment actions recorded']) }}"
 
     - name: Export posture summary via set_stats
       ansible.builtin.set_stats:

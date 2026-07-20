@@ -168,6 +168,19 @@
         description: "Module 1: SELinux booleans and AIDE file integrity monitoring"
         state: present
 
+    - name: Create job template -- DEFEND - Restore Containment
+      ansible.controller.job_template:
+        name: "DEFEND - Restore Containment"
+        organization: "{{ workshop_org }}"
+        project: "{{ workshop_project_name }}"
+        playbook: "lab/playbooks/defend/restore-containment.yml"
+        inventory: "{{ workshop_inventory_name }}"
+        credential: "{{ workshop_credential_name }}"
+        execution_environment: "{{ workshop_ee_name }}"
+        ask_limit_on_launch: true
+        description: "Module 1: Undo containment — restore eth0 to public, revert hardening"
+        state: present
+
     - name: Create job template -- DEFEND - Verify Security Posture
       ansible.controller.job_template:
         name: "DEFEND - Verify Security Posture"
