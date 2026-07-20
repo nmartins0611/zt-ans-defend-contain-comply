@@ -117,13 +117,10 @@ Your lab consists of:
 | Credential | Value
 
 | AAP Controller admin
-| `admin` / `{aap_admin_password}`
-
-| EDA Controller admin
-| `admin` / `{eda_admin_password}`
+| `admin` / `ansible123!`
 
 | App server SSH
-| `lab-user` (passwordless sudo)
+| `rhel` / `ansible123!`
 |===
 
 == Next steps
