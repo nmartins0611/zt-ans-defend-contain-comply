@@ -17,8 +17,7 @@
 #       "current_hour":     <int>,    -- from ansible_date_time.hour
 #       "backup_age_hours": <float>,  -- hours since /var/log/last-backup-timestamp was modified
 #       "free_disk_gb":     <float>,  -- free space on / in GB
-#       "service_state":    <string>, -- ActiveState of httpd (e.g. "active")
-#       "requesting_user":  <string>  -- AAP user who launched the job (tower_user_name)
+#       "service_state":    <string>  -- ActiveState of httpd (e.g. "active")
 #     }
 #   }
 #
@@ -38,7 +37,6 @@
 #   - Calculate age: (epoch_now - mtime) / 3600
 #   - ansible_mounts gives you mount info; filter for mount == "/"
 #   - Use ansible.builtin.uri to POST to OPA
-#   - AAP injects tower_user_name automatically — use it as requesting_user
 #   - Use ansible.builtin.fail with when: to block patching
 #   - Use ansible.builtin.set_stats to pass data to workflow nodes
 #
@@ -52,7 +50,6 @@
     opa_url: "http://{{ opa_host | default('central') }}:{{ opa_port | default(8181) }}"
     target_service: httpd
     backup_marker_path: /var/log/last-backup-timestamp
-    requesting_user: "{{ tower_user_name | default(awx_user_name, true) | default('unknown') }}"
 
   tasks:
     # Step 1: Gather system facts for policy evaluation
@@ -73,10 +70,10 @@
       # TODO: Set fact free_disk_gb from ansible_mounts (mount == "/")
       #       Convert bytes to GB (divide by 1073741824)
 
-    # Step 2: Query OPA (include requesting_user in the input!)
+    # Step 2: Query OPA
     - name: Query OPA patch policy
       # TODO: POST to {{ opa_url }}/v1/data/dcc/patch_policy/result
-      #       Body: { "input": { current_hour, backup_age_hours, free_disk_gb, service_state, requesting_user } }
+      #       Body: { "input": { current_hour, backup_age_hours, free_disk_gb, service_state } }
       #       Register as _opa_response
 
     # Step 3: Display results
@@ -92,4 +89,4 @@
     # Step 5: Record for workflow
     - name: Record policy check pass
       # TODO: Use ansible.builtin.set_stats to record:
-      #       pre_patch_policy_passed, policy_check_timestamp, policy_gates_passed, requesting_user
+      #       pre_patch_policy_passed, policy_check_timestamp, policy_gates_passed

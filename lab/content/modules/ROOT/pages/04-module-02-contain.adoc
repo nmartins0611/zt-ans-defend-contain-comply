@@ -18,7 +18,7 @@ In this module you will build and execute a policy-gated patching workflow in AA
 By the end of this module, you'll be able to:
 
 * Write an Ansible playbook that queries OPA for policy decisions
-* Enforce role-based access control through policy-as-code (OPA user authorization gate)
+* Configure an AAP execution policy that enforces role-based access via OPA
 * Construct a multi-node AAP workflow with approval gates
 * Execute a patching workflow with policy enforcement
 * Generate compliance evidence as a workflow artifact
@@ -95,11 +95,9 @@ The key steps are:
 
 Your playbook should:
 
-* Query OPA and display all gate results (PASS/FAIL) for each of the five gates
-* The four system gates (maintenance window, backup, disk space, service health) should all **PASS**
-* The `user_authorized` gate will **FAIL** because you are running as `admin` — this is expected and will be addressed in Exercise 4
-* The playbook should fail with a clear message showing which gates were violated
-* Gates passed: 4/5 (the user authorization gate is the only failure)
+* Query OPA and display all gate results (PASS/FAIL)
+* Complete successfully when all gates pass
+* Show the number of passed gates (4/4)
 
 == Exercise 3: Build the Patching Workflow in AAP Controller
 
@@ -178,56 +176,61 @@ CONTAIN - Pre-Patch Check → Approve Patch Application → CONTAIN - Patch Syst
 * The approval gate sits between the policy check and the patch application
 * All links use **On Success** (or **On Approve** for the approval node)
 
-== Exercise 4: Role-Based Policy Enforcement
+== Exercise 4: Policy-as-Code Execution Gate
 
 [NOTE.why]
 ====
-*Why we do this:* Policy-as-code isn't just about system state — it's about *who* can execute critical operations. In regulated environments, a general administrator shouldn't be able to apply security patches; that's the security team's responsibility. By encoding authorized users into OPA, you enforce separation of duties at the automation layer — not just at the AAP RBAC level, but as a policy gate that applies regardless of AAP permissions. If someone gains admin access, OPA still blocks them from patching unless they're an authorized security engineer.
+*Why we do this:* Policy-as-code isn't just about system state — it's about *who* can execute critical operations. In regulated environments, a general administrator shouldn't be able to apply security patches; that's the security team's responsibility. AAP Controller's Policy feature integrates directly with OPA to enforce this at the platform level — before a job even starts. This is stronger than RBAC alone: RBAC controls what you can *see and click*, but an execution policy controls what the platform is *allowed to run*. Even a superuser can be blocked by policy.
 ====
 
-The OPA patch policy includes a `user_authorized` gate that checks who launched the job. Only users in the authorized list (currently `security_engineer`) are permitted to run patching operations. Let's see this in action.
+AAP Controller can enforce OPA policies as execution gates. You will configure a policy that blocks the patching workflow unless it's launched by an authorized security engineer.
 
-. First, examine the policy gate. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-patch-policy.rego`.
+. First, examine the execution policy. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-execution-policy.rego`.
 +
-Look for the `authorized_patch_users` set and the `user_authorized` rule — only usernames in that set will pass the gate.
+This policy checks `input.user` against an `authorized_users` set that only contains `security_engineer`. Any other user — including `admin` — is denied with a clear reason.
 
-. You are currently logged into AAP Controller as `admin`. Navigate to **Automation Execution → Templates** and launch the **CONTAIN - Pre-Patch Check** job template.
+. In AAP Controller, navigate to **Automation Execution → Policy**.
 
-. Watch the job output. The playbook sends `requesting_user: admin` to OPA. You'll see:
+. Click **Create policy** and configure:
 +
-----
-FAIL | user_authorized: User 'admin' is authorized for patching operations
-----
+* Name: `Patch Authorization`
+* Description: `Only security engineers may execute patching workflows`
+* OPA server URL: `http://central:8181/v1/data/dcc/execution_policy/result`
+* Click **Create policy**
+
+. Associate the policy with the patching workflow:
 +
-The job **fails** with a policy violation: `admin` is not in the authorized users list.
+* Find the **Policy-Gated Patching** workflow template
+* Attach the **Patch Authorization** policy as an execution gate
++
+This means AAP will query OPA *before* the workflow starts. If OPA returns `allow: false`, the workflow is blocked at the platform level — no playbook code runs at all.
+
+. Test as `admin`: navigate to **Automation Execution → Templates** and try to launch the **Policy-Gated Patching** workflow.
++
+AAP blocks the launch — the policy gate denies `admin`. Note the difference from Exercise 2: the pre-patch check playbook evaluates *system state* (backup, disk, service). The execution policy evaluates *who is requesting the action*. Two layers, two concerns.
 +
 [IMPORTANT]
 ====
-This is the key insight: even though `admin` has full AAP permissions, **OPA denies the operation** at the policy layer. AAP RBAC controls *what you can click*; OPA controls *what the automation is allowed to do*. Defense in depth.
+This is the key insight: even though `admin` has full AAP permissions, **the platform refuses to execute the workflow**. RBAC controls what you can click; Policy-as-Code controls what the automation is allowed to do. Defense in depth.
 ====
 
-. Now log out of AAP Controller (click the user icon in the top right → **Log out**).
+. Log out of AAP Controller (click the user icon in the top right → **Log out**).
 
 . Log back in as the security engineer:
 +
 * Username: `security_engineer`
 * Password: `ansible123!`
 
-. Navigate to **Automation Execution → Templates** and launch the **CONTAIN - Pre-Patch Check** job template again.
-
-. This time, all gates pass — including `user_authorized`:
+. Navigate to **Automation Execution → Templates** and launch the **Policy-Gated Patching** workflow again.
 +
-----
-PASS | user_authorized: User 'security_engineer' is authorized for patching operations
-----
-+
-The policy check completes successfully.
+This time, the policy gate passes — `security_engineer` is in the authorized set. The workflow starts and proceeds to the pre-patch system checks.
 
 === Verify
 
-* Running as `admin` → OPA denies with `user_authorized` gate failure
-* Running as `security_engineer` → all gates pass, including user authorization
-* The same playbook, same system state — the only difference is *who* is running it
+* Launching as `admin` → AAP blocks the workflow before it starts (execution policy denied)
+* Launching as `security_engineer` → the policy gate passes and the workflow begins
+* The same workflow, same system — the only difference is *who* is running it
+* Two policy layers work together: AAP Policy gates *who can execute*, OPA patch policy gates *system readiness*
 
 == Exercise 5: Execute the Patching Workflow
 
@@ -236,7 +239,7 @@ The policy check completes successfully.
 *Why we do this:* Running the workflow end-to-end proves the full chain works: policy evaluation, human approval, patch application, post-patch verification, and compliance reporting — all as a single auditable unit of work. The `set_stats` data flowing between nodes creates a machine-readable audit trail that compliance teams can query.
 ====
 
-Stay logged in as `security_engineer` — the workflow's pre-patch check will verify your identity against OPA.
+Stay logged in as `security_engineer` — the execution policy you configured in Exercise 4 has already verified your identity. Now the workflow's pre-patch check will evaluate system readiness.
 
 . In AAP Controller, navigate to **Automation Execution → Templates** and find the **Policy-Gated Patching** workflow you just created.
 
@@ -245,10 +248,10 @@ Stay logged in as `security_engineer` — the workflow's pre-patch check will ve
 . Watch the first node (**CONTAIN - Pre-Patch Check**) execute. It will:
 +
 * Gather system facts (backup age, disk space, service health)
-* Verify `security_engineer` is authorized via OPA
+* Send the data to OPA for system-level policy evaluation
 * Display PASS/FAIL for each gate
 +
-If all gates pass (including user authorization), the workflow proceeds to the approval node.
+If all system gates pass, the workflow proceeds to the approval node.
 
 . The workflow will **pause** at the **Approve Patch Application** node. You'll see a notification banner in AAP.
 +
@@ -297,7 +300,7 @@ ssh rhel01 sudo systemctl status httpd --no-pager
 * `httpd` is upgraded to the patched version (`httpd-2.4.62-1.el9` or newer)
 * {target_cve} no longer appears in pending advisories
 * The approval gate paused the workflow until you explicitly approved
-* The pre-patch check shows `security_engineer` passed the user authorization gate
+* The execution policy allowed `security_engineer` to launch the workflow
 
 == Exercise 6: Review the Compliance Report
 
@@ -410,7 +413,7 @@ You've successfully completed the CONTAIN module.
 **What you accomplished:**
 
 * Wrote an Ansible playbook that queries OPA for policy-as-code decisions
-* Demonstrated role-based policy enforcement — `admin` blocked, `security_engineer` authorized
+* Configured an AAP execution policy that queries OPA to enforce separation of duties
 * Built a multi-node AAP workflow with an approval gate
 * Executed policy-gated patching end-to-end as an authorized security engineer
 * Generated compliance evidence automatically
@@ -419,7 +422,7 @@ You've successfully completed the CONTAIN module.
 **Key takeaways:**
 
 * OPA evaluates policy gates — Ansible gathers facts and enforces the decision
-* Policy-as-code enforces separation of duties: AAP RBAC controls what you can click, OPA controls what the automation is allowed to do
+* AAP execution policies enforce separation of duties at the platform level — OPA decides who can run what, before any playbook code executes
 * Approval nodes provide human-in-the-loop without slowing automation
 * `set_stats` provides a machine-readable audit trail across workflow nodes
 * Compliance reporting as a workflow step eliminates manual evidence gathering
