@@ -7,7 +7,6 @@
     opa_url: "http://{{ opa_host | default('central') }}:{{ opa_port | default(8181) }}"
     target_service: httpd
     backup_marker_path: /var/log/last-backup-timestamp
-    requesting_user: "{{ tower_user_name | default(awx_user_name, true) | default('unknown') }}"
 
   tasks:
     - name: Gather system facts for policy evaluation
@@ -44,14 +43,13 @@
             backup_age_hours: "{{ backup_age_hours | float }}"
             free_disk_gb: "{{ free_disk_gb | float }}"
             service_state: "{{ _service_state.status.ActiveState }}"
-            requesting_user: "{{ requesting_user }}"
         return_content: true
       register: _opa_response
 
     - name: Display policy gate results
       ansible.builtin.debug:
         msg: |
-          OPA Patch Policy Evaluation (requested by: {{ requesting_user }}):
+          OPA Patch Policy Evaluation:
           {% for gate_name, gate_result in _opa_response.json.result.gates.items() %}
             {{ 'PASS' if gate_result.pass else 'FAIL' }} | {{ gate_name }}: {{ gate_result.description }}
           {% endfor %}
@@ -63,7 +61,7 @@
       ansible.builtin.fail:
         msg: >-
           POLICY VIOLATION: {{ _opa_response.json.result.failed_gates | join(', ') }}
-          failed. Patching not permitted for user '{{ requesting_user }}'.
+          failed. Patching not permitted.
       when: not (_opa_response.json.result.allow_patch | bool)
 
     - name: Record policy check pass
@@ -72,4 +70,3 @@
           pre_patch_policy_passed: true
           policy_check_timestamp: "{{ ansible_date_time.iso8601 }}"
           policy_gates_passed: "{{ _opa_response.json.result.passed_gates }}"
-          requesting_user: "{{ requesting_user }}"
