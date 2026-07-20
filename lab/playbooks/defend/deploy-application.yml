@@ -147,8 +147,8 @@
         dest: /etc/yum.repos.d/dcc-errata.repo
         mode: "0644"
 
-    - name: Clean dnf metadata to pick up errata repo updateinfo
-      ansible.builtin.command: dnf clean metadata
+    - name: Clean dnf metadata and rebuild cache
+      ansible.builtin.shell: dnf clean metadata && dnf makecache
       changed_when: true
 
     - name: Verify errata repo is reachable
@@ -160,18 +160,16 @@
       until: "'dcc-errata' in _repolist.stdout"
 
     - name: Verify CVE appears in advisory list
-      ansible.builtin.command: yum updateinfo list cves --quiet
+      ansible.builtin.command: yum updateinfo list cves
       register: _cve_check
       changed_when: false
+      retries: 3
+      delay: 10
+      until: "target_cve in _cve_check.stdout"
 
     - name: Confirm target CVE is detectable
-      ansible.builtin.assert:
-        that:
-          - target_cve in _cve_check.stdout
-        fail_msg: >-
-          {{ target_cve }} not found in advisory list. Check that the errata repo
-          is serving updateinfo.xml and the vulnerable httpd version is installed.
-        success_msg: "{{ target_cve }} detected -- app deployed with vulnerable httpd."
+      ansible.builtin.debug:
+        msg: "{{ target_cve }} detected -- app deployed with vulnerable httpd."
 
     # ── Backup marker ────────────────────────────────────────────────
     - name: Create backup marker file for pre-patch policy gate
