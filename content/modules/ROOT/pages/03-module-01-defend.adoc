@@ -470,9 +470,9 @@ You can verify the saved search fired by navigating to **Settings → Searches, 
 If you don't want to wait for the cron cycle, you can trigger the saved search manually: open **Search & Reporting**, find "DCC CVE Alert" in **Reports**, and click **Run**.
 ====
 
-. Switch to the **AAP Controller** tab — you should see the event received and your rule matched in the rulebook activation history.
+. Switch to the **AAP Controller** tab and navigate to **Automation Decisions → Event Streams**  — you should see the event received. Navigate to **Rule Audit** and verify you have a successful **CVE alert from Splunk** event. Select this event, and then click on **Actions** in the details of the event to see which job was launched.
 
-. Switch to the **AAP Controller** tab and navigate to **Views → Jobs** — the **Vulnerability Containment** workflow should be launching automatically, limited to `rhel02`.
+. On the **AAP Controller** tab and navigate to **Automation Execution → Jobs** — the **Vulnerability Containment** workflow should be launching automatically, limited to `rhel02`.
 
 . Watch the workflow complete. Then click the **Portal - rhel02** tab and refresh — the portal should **no longer be accessible**.
 
