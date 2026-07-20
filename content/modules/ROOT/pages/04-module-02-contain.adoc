@@ -182,12 +182,15 @@ AAP Controller can enforce OPA policies as execution gates. You will configure a
 
 . First, examine the execution policy. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-execution-policy.rego`.
 +
-This policy checks `input.user` against an `authorized_users` set that only contains `security_engineer`. Any other user — including `admin` — is denied with a clear reason.
+This policy uses the `aap.gateway` package — the standard contract for AAP 2.6 platform policies. It checks `input.created_by.username` (the AAP user who launched the job) and classifies the template name. Any template containing "patch" requires the user to be in the `_authorized_patch_users` set — currently only `security_engineer`.
++
+The output contract is `{"allowed": bool, "violations": [strings]}` — AAP reads `allowed` to gate execution and displays `violations` to the user.
 
 . In AAP Controller, navigate to **Settings → Automation Execution → Policy** and click onthe pencil to edit the settings.
 
 . Click **Create policy** and configure:
 +
+
 * OPA Server hostname: `central`
 * OPA server URL: `http://central:8181/v1/data/dcc/execution_policy/result`
 * Click **save**
