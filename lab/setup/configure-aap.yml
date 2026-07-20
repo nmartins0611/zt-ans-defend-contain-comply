@@ -19,6 +19,25 @@
       validate_certs: false
 
   tasks:
+    # ── Users ────────────────────────────────────────────────────────────
+    - name: Create security_engineer user
+      ansible.controller.user:
+        username: security_engineer
+        password: "{{ aap_password }}"
+        first_name: Security
+        last_name: Engineer
+        email: security_engineer@benekratis.example.com
+        is_superuser: false
+        state: present
+
+    - name: Grant security_engineer execute role on Default organization
+      ansible.controller.role:
+        user: security_engineer
+        role: execute
+        organizations:
+          - "{{ workshop_org }}"
+        state: present
+
     # ── Credential ─────────────────────────────────────────────────────
     - name: Create machine credential for app server
       ansible.controller.credential:
@@ -119,6 +138,7 @@
         inventory: "{{ workshop_inventory_name }}"
         credential: "{{ workshop_credential_name }}"
         execution_environment: "{{ workshop_ee_name }}"
+        ask_limit_on_launch: true
         extra_vars:
           target_cve: "{{ target_cve }}"
         description: "Module 1: Scan target for CVE-2024-38476, report to Splunk"
@@ -146,6 +166,18 @@
         credential: "{{ workshop_credential_name }}"
         execution_environment: "{{ workshop_ee_name }}"
         description: "Module 1: SELinux booleans and AIDE file integrity monitoring"
+        state: present
+
+    - name: Create job template -- DEFEND - Verify Security Posture
+      ansible.controller.job_template:
+        name: "DEFEND - Verify Security Posture"
+        organization: "{{ workshop_org }}"
+        project: "{{ workshop_project_name }}"
+        playbook: "lab/playbooks/defend/verify-security-posture.yml"
+        inventory: "{{ workshop_inventory_name }}"
+        credential: "{{ workshop_credential_name }}"
+        execution_environment: "{{ workshop_ee_name }}"
+        description: "Module 1: Display containment state across all app servers"
         state: present
 
     # ── Job Templates (Module 2: CONTAIN) ──────────────────────────────
@@ -290,6 +322,7 @@
         organization: "{{ workshop_org }}"
         inventory: "{{ workshop_inventory_name }}"
         ask_limit_on_launch: true
+        ask_variables_on_launch: true
         state: present
 
     - name: Build Vulnerability Containment workflow nodes

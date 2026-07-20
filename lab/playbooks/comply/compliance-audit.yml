@@ -5,9 +5,9 @@
 
   vars:
     opa_url: "http://{{ opa_host | default('central') }}:{{ opa_port | default(8181) }}"
-    audit_phase: "{{ audit_phase | default('pre') }}"
+    _audit_phase: "{{ audit_phase | default('pre') }}"
     report_output_dir: /tmp/compliance-reports
-    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    _target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
 
   tasks:
     - name: Ensure report directory exists
@@ -89,7 +89,7 @@
           passwd_mode: "{{ _file_perms.results[0].stat.mode | int(base=8) % 4096 }}"
           shadow_mode: "{{ _file_perms.results[1].stat.mode | int(base=8) % 4096 }}"
           rpcbind_enabled: "{{ _rpcbind.stdout == 'enabled' }}"
-          open_cves: "{{ [target_cve] if target_cve in _cve_list.stdout else [] }}"
+          open_cves: "{{ [_target_cve] if _target_cve in _cve_list.stdout else [] }}"
 
     - name: Query OPA compliance policy
       ansible.builtin.uri:
@@ -104,19 +104,19 @@
     - name: Save audit results
       ansible.builtin.copy:
         content: "{{ _opa_response.json.result | to_nice_json }}"
-        dest: "{{ report_output_dir }}/audit-results-{{ audit_phase }}.json"
+        dest: "{{ report_output_dir }}/audit-results-{{ _audit_phase }}.json"
         mode: "0644"
 
     - name: Display audit summary
       ansible.builtin.debug:
         msg: |
-          Compliance Audit ({{ audit_phase }}):
+          Compliance Audit ({{ _audit_phase }}):
             Compliant: {{ _opa_response.json.result.compliant }}
             Controls:  {{ _opa_response.json.result.passed }}/{{ _opa_response.json.result.total }} passed
 
     - name: Set audit stats for workflow
       ansible.builtin.set_stats:
         data:
-          "{{ audit_phase }}_audit_compliant": "{{ _opa_response.json.result.compliant }}"
-          "{{ audit_phase }}_audit_pass_count": "{{ _opa_response.json.result.passed }}"
-          "{{ audit_phase }}_audit_total_count": "{{ _opa_response.json.result.total }}"
+          "{{ _audit_phase }}_audit_compliant": "{{ _opa_response.json.result.compliant }}"
+          "{{ _audit_phase }}_audit_pass_count": "{{ _opa_response.json.result.passed }}"
+          "{{ _audit_phase }}_audit_total_count": "{{ _opa_response.json.result.total }}"

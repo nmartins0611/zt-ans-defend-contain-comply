@@ -69,7 +69,7 @@ index=main sourcetype=linux_secure "CVE-2024-38476" OR "httpd" OR "vulnerability
 +
 This groups the findings by host and log source — this is the query that powers the Splunk saved search alert.
 
-. Navigate to **Settings → Searches, reports, and alerts** to see the pre-configured **DCC CVE Alert** saved search. This search runs every 5 minutes and is configured to fire a webhook when it detects matches.
+. Navigate to **Settings → Searches, reports, and alerts** to see the pre-configured **DCC CVE Alert** saved search. This search runs every minute and is configured to fire the EDA add-on action when it detects matches.
 
 ==== Verify
 
@@ -481,26 +481,11 @@ ssh rhel02 sudo firewall-cmd --get-active-zones
 +
 `eth0` should be in `internal-only`, `eth1` should remain in `public` — same as rhel01.
 
-. Compare the containment state across both hosts side by side:
+. Run the **DEFEND - Verify Security Posture** job template from AAP Controller to compare the containment state across both hosts:
 +
-[source,role="execute"]
-----
-for host in rhel01 rhel02; do
-  echo "=== $host ==="
-  echo "-- Service state --"
-  ssh $host sudo systemctl is-active httpd
-  echo "-- Active zones --"
-  ssh $host sudo firewall-cmd --get-active-zones
-  echo "-- Internal access --"
-  IP=$(ssh $host hostname -I | awk '{for(i=1;i<=NF;i++) if($i ~ /^192\.168/) print $i}')
-  curl -so /dev/null -w "  http://$IP -> HTTP %{http_code}\n" "http://$IP" 2>/dev/null || echo "  unreachable"
-  echo "-- SELinux booleans --"
-  ssh $host getsebool httpd_can_network_connect httpd_enable_cgi
-  echo "-- Containment log --"
-  ssh $host cat /var/log/containment-actions.log 2>/dev/null
-  echo ""
-done
-----
+In **Automation Execution → Templates**, find **DEFEND - Verify Security Posture** and click **Launch**.
++
+The playbook runs against all app servers and produces a structured report for each host showing: service state, firewall zones, containment zone details, internal HTTP access, SELinux booleans, httpd hardening, AIDE monitoring, and the containment log.
 +
 Both hosts should show identical containment posture — external interface isolated, httpd still running internally, SELinux hardened. The difference is *how* they got there.
 

@@ -5,8 +5,8 @@
 
   vars:
     report_output_dir: /tmp/compliance-reports
-    target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
-    target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
+    _target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
+    _target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
     organization: Benekratis Capital
 
   tasks:
@@ -55,8 +55,8 @@
         report_data:
           host: "{{ inventory_hostname }}"
           timestamp: "{{ ansible_date_time.iso8601 }}"
-          cve: "{{ target_cve }}"
-          advisory: "{{ target_advisory }}"
+          cve: "{{ _target_cve }}"
+          advisory: "{{ _target_advisory }}"
           organization: "{{ organization }}"
           httpd_version: "{{ _current_httpd.stdout }}"
           selinux_status: "{{ _sestatus.stdout }}"
