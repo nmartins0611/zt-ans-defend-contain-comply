@@ -187,7 +187,9 @@ AAP Controller can enforce OPA policies as execution gates. You will configure a
 
 . First, examine the execution policy. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-execution-policy.rego`.
 +
-This policy checks `input.user` against an `authorized_users` set that only contains `security_engineer`. Any other user — including `admin` — is denied with a clear reason.
+This policy uses the `aap.gateway` package — the standard contract for AAP 2.6 platform policies. It checks `input.created_by.username` (the AAP user who launched the job) and classifies the template name. Any template containing "patch" requires the user to be in the `_authorized_patch_users` set — currently only `security_engineer`.
++
+The output contract is `{"allowed": bool, "violations": [strings]}` — AAP reads `allowed` to gate execution and displays `violations` to the user.
 
 . In AAP Controller, navigate to **Automation Execution → Policy**.
 
@@ -195,15 +197,13 @@ This policy checks `input.user` against an `authorized_users` set that only cont
 +
 * Name: `Patch Authorization`
 * Description: `Only security engineers may execute patching workflows`
-* OPA server URL: `http://central:8181/v1/data/dcc/execution_policy/result`
+* OPA server URL: `http://central:8181`
+* Policy query path: `aap/gateway/decision`
 * Click **Create policy**
 
-. Associate the policy with the patching workflow:
+. Associate the policy with the **Default** organization so it applies to all templates.
 +
-* Find the **Policy-Gated Patching** workflow template
-* Attach the **Patch Authorization** policy as an execution gate
-+
-This means AAP will query OPA *before* the workflow starts. If OPA returns `allow: false`, the workflow is blocked at the platform level — no playbook code runs at all.
+This means AAP will query OPA *before* any job launches. For patching templates, OPA checks the requesting user. If OPA returns `allowed: false`, the workflow is blocked at the platform level — no playbook code runs at all. Non-patching templates are allowed for any user.
 
 . Test as `admin`: navigate to **Automation Execution → Templates** and try to launch the **Policy-Gated Patching** workflow.
 +
