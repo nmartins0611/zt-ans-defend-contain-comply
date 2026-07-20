@@ -36,7 +36,7 @@ Before writing the playbook, understand the policies that govern patching at Ben
 +
 Note the four automatable gates: maintenance window, backup verification, disk space, and service health. The fifth gate (change approval) is enforced by an AAP approval node.
 
-. Simulate a recent backup on the app server by creating the backup marker:
+. Navigate to **Terminal ** and simulate a recent backup on the app server by creating the backup marker:
 +
 [source,role="execute"]
 ----
@@ -70,34 +70,29 @@ The patch policy defines clear, automatable prerequisites. The backup marker exi
 
 You will write a playbook that gathers system facts, sends them to OPA for evaluation, and blocks patching if any policy gates fail. A skeleton file with detailed instructions has been provided.
 
-. In the *Gitea* tab, navigate to `lab/playbooks/contain/pre-patch-check-exercise.yml` and read through the exercise skeleton.
-+
-Read the comments carefully — they describe the OPA input payload format and the expected response structure.
+. First, we need to look at what the policy actually is. Go the *Gitea* tab, navigate to `lab/policies/patch-policy.yml` and read through the Rego policy. The company policy will check for:
 
-. Open `lab/playbooks/contain/pre-patch-check.yml` in Gitea, click the pencil icon to edit, and complete all the TODO tasks described in the exercise skeleton.
+. Maintenance Window
+. Backup Verification
+. Disk Space
+. Service Health
+. Change Approval in AAP
+
+. In the *Gitea* tab, navigate to `lab/playbooks/contain/pre-patch-check.yml` and read through the playbook. Uncomment the **Query OPA patch policy** task. 
+
 +
 [TIP]
 ====
-The key steps are:
-
-. Use `ansible.builtin.stat` to get the backup marker's mtime, then calculate age in hours
-. Use `ansible.builtin.systemd` to check httpd's ActiveState
-. Get free disk space from `ansible_mounts` (filter for `mount == "/"`, divide `size_available` by 1073741824)
-. POST the four values to `http://central:8181/v1/data/dcc/patch_policy/result` using `ansible.builtin.uri`
-. Use `ansible.builtin.fail` with `when: not _opa_response.json.result.allow_patch` to enforce the policy
+. We use `ansible.builtin.stat` to get the backup marker's mtime, then calculate age in hours
+. We use `ansible.builtin.systemd` to check httpd's ActiveState
+. We get free disk space from `ansible_mounts` (filter for `mount == "/"`, divide `size_available` by 1073741824)
+. We POST the four values to `http://central:8181/v1/data/dcc/patch_policy/result` using `ansible.builtin.uri`
+. We use `ansible.builtin.fail` with `when: not _opa_response.json.result.allow_patch` to enforce the policy
 ====
 
-. Commit your changes in Gitea, then sync the project in AAP Controller (*Resources → Projects → DCC Workshop → Sync*). Test by launching the *CONTAIN - Pre-Patch Check* job template.
+. Commit your changes in Gitea, then sync the project in AAP Controller (*Automation Execution → Projects → DCC Workshop → Sync*). Test by launching the *CONTAIN - Pre-Patch Check* job template.
 
-. If you get stuck, the solution is in Gitea at `lab/playbooks/contain/pre-patch-check-exercise.yml` — compare the TODO comments with the completed tasks in the solution.
 
-=== Verify
-
-Your playbook should:
-
-* Query OPA and display all gate results (PASS/FAIL)
-* Complete successfully when all gates pass
-* Show the number of passed gates (4/4)
 
 == Exercise 3: Build the Patching Workflow in AAP Controller
 
@@ -191,19 +186,18 @@ This policy uses the `aap.gateway` package — the standard contract for AAP 2.6
 +
 The output contract is `{"allowed": bool, "violations": [strings]}` — AAP reads `allowed` to gate execution and displays `violations` to the user.
 
-. In AAP Controller, navigate to **Automation Execution → Policy**.
+. In AAP Controller, navigate to **Settings → Automation Execution → Policy** and click onthe pencil to edit the settings.
 
 . Click **Create policy** and configure:
 +
-* Name: `Patch Authorization`
-* Description: `Only security engineers may execute patching workflows`
-* OPA server URL: `http://central:8181`
-* Policy query path: `aap/gateway/decision`
-* Click **Create policy**
 
-. Associate the policy with the **Default** organization so it applies to all templates.
-+
-This means AAP will query OPA *before* any job launches. For patching templates, OPA checks the requesting user. If OPA returns `allowed: false`, the workflow is blocked at the platform level — no playbook code runs at all. Non-patching templates are allowed for any user.
+* OPA Server hostname: `central`
+* OPA server URL: `http://central:8181/v1/data/dcc/execution_policy/result`
+* Click **save**
+
+. Next navigate to **Access Management → Organizations**, and click on the pencil to edit **Default**. Configure the **Policy Enforcement** path to be: `aap/gateway/decision`.
+
+This means AAP will query OPA *before* the workflow starts. If OPA returns `allow: false`, the workflow is blocked at the platform level — no playbook code runs at all.
 
 . Test as `admin`: navigate to **Automation Execution → Templates** and try to launch the **Policy-Gated Patching** workflow.
 +
@@ -225,13 +219,6 @@ This is the key insight: even though `admin` has full AAP permissions, **the pla
 +
 This time, the policy gate passes — `security_engineer` is in the authorized set. The workflow starts and proceeds to the pre-patch system checks.
 
-=== Verify
-
-* Launching as `admin` → AAP blocks the workflow before it starts (execution policy denied)
-* Launching as `security_engineer` → the policy gate passes and the workflow begins
-* The same workflow, same system — the only difference is *who* is running it
-* Two policy layers work together: AAP Policy gates *who can execute*, OPA patch policy gates *system readiness*
-
 == Exercise 5: Execute the Patching Workflow
 
 [NOTE.why]
@@ -251,7 +238,14 @@ Stay logged in as `security_engineer` — the execution policy you configured in
 * Send the data to OPA for system-level policy evaluation
 * Display PASS/FAIL for each gate
 +
-If all system gates pass, the workflow proceeds to the approval node.
+If all system gates pass, the workflow proceeds to the approval node. We expect however that the workflow fails since rhel01 was backed up but not rhel02. Run the command to simulate the backup on rhel02 in **Terminal**.
+
++
+[source,role="execute"]
+----
+ssh rhel02 sudo touch /var/log/last-backup-timestamp
+----
++
 
 . The workflow will **pause** at the **Approve Patch Application** node. You'll see a notification banner in AAP.
 +
