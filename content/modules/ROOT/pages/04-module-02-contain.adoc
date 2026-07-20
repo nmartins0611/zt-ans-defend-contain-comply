@@ -184,20 +184,16 @@ AAP Controller can enforce OPA policies as execution gates. You will configure a
 +
 This policy checks `input.user` against an `authorized_users` set that only contains `security_engineer`. Any other user — including `admin` — is denied with a clear reason.
 
-. In AAP Controller, navigate to **Automation Execution → Policy**.
+. In AAP Controller, navigate to **Settings → Automation Execution → Policy** and click onthe pencil to edit the settings.
 
 . Click **Create policy** and configure:
 +
-* Name: `Patch Authorization`
-* Description: `Only security engineers may execute patching workflows`
+* OPA Server hostname: `central`
 * OPA server URL: `http://central:8181/v1/data/dcc/execution_policy/result`
-* Click **Create policy**
+* Click **save**
 
-. Associate the policy with the patching workflow:
-+
-* Find the **Policy-Gated Patching** workflow template
-* Attach the **Patch Authorization** policy as an execution gate
-+
+. Next navigate to **Access Management → Organizations**, and click on the pencil to edit **Default**. Configure the **Policy Enforcement** path to be: `aap/gateway/decision`.
+
 This means AAP will query OPA *before* the workflow starts. If OPA returns `allow: false`, the workflow is blocked at the platform level — no playbook code runs at all.
 
 . Test as `admin`: navigate to **Automation Execution → Templates** and try to launch the **Policy-Gated Patching** workflow.
@@ -220,13 +216,6 @@ This is the key insight: even though `admin` has full AAP permissions, **the pla
 +
 This time, the policy gate passes — `security_engineer` is in the authorized set. The workflow starts and proceeds to the pre-patch system checks.
 
-=== Verify
-
-* Launching as `admin` → AAP blocks the workflow before it starts (execution policy denied)
-* Launching as `security_engineer` → the policy gate passes and the workflow begins
-* The same workflow, same system — the only difference is *who* is running it
-* Two policy layers work together: AAP Policy gates *who can execute*, OPA patch policy gates *system readiness*
-
 == Exercise 5: Execute the Patching Workflow
 
 [NOTE.why]
@@ -246,7 +235,14 @@ Stay logged in as `security_engineer` — the execution policy you configured in
 * Send the data to OPA for system-level policy evaluation
 * Display PASS/FAIL for each gate
 +
-If all system gates pass, the workflow proceeds to the approval node.
+If all system gates pass, the workflow proceeds to the approval node. We expect however that the workflow fails since rhel01 was backed up but not rhel02. Run the command to simulate the backup on rhel02 in **Terminal**.
+
++
+[source,role="execute"]
+----
+ssh rhel02 sudo touch /var/log/last-backup-timestamp
+----
++
 
 . The workflow will **pause** at the **Approve Patch Application** node. You'll see a notification banner in AAP.
 +
