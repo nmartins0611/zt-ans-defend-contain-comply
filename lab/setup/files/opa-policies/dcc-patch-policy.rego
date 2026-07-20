@@ -12,17 +12,17 @@ default user_authorized := false
 authorized_patch_users := {"security_engineer"}
 
 maintenance_window_ok if {
-	hour := input.current_hour
+	hour := to_number(input.current_hour)
 	hour >= 6
 	hour < 22
 }
 
 backup_current if {
-	input.backup_age_hours < 24
+	to_number(input.backup_age_hours) < 24
 }
 
 disk_space_ok if {
-	input.free_disk_gb > 2
+	to_number(input.free_disk_gb) > 2
 }
 
 service_healthy if {

@@ -95,9 +95,11 @@ The key steps are:
 
 Your playbook should:
 
-* Query OPA and display all gate results (PASS/FAIL)
-* Complete successfully when all gates pass
-* Show the number of passed gates (4/4)
+* Query OPA and display all gate results (PASS/FAIL) for each of the five gates
+* The four system gates (maintenance window, backup, disk space, service health) should all **PASS**
+* The `user_authorized` gate will **FAIL** because you are running as `admin` — this is expected and will be addressed in Exercise 4
+* The playbook should fail with a clear message showing which gates were violated
+* Gates passed: 4/5 (the user authorization gate is the only failure)
 
 == Exercise 3: Build the Patching Workflow in AAP Controller
 
