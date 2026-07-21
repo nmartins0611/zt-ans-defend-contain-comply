@@ -31,7 +31,7 @@ patching, and compliance hardening using Red Hat Ansible Automation Platform.
 
 | `control`  | AAP Controller 2.6 + EDA Controller
 | `central`  | Splunk (SIEM), OPA (policy engine), errata yum repo
-| `rhel01`   | Target app server (Benekratis Capital customer portal)
+| `rhel01`   | Target app server (Parasol Finance customer portal)
 | `rhel02`   | Spare RHEL host
 | `gitea`    | Git repository (containerized)
 |===

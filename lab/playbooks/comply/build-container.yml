@@ -1,10 +1,10 @@
 ---
 - name: Build hardened application container
-  hosts: appservers
+  hosts: rhel01
   gather_facts: true
 
   vars:
-    container_name: benekratis-app
+    container_name: parasol-app
     container_tag: "{{ ansible_date_time.date }}"
     containerfile_src: "{{ playbook_dir }}/../../templates/Containerfile.j2"
     build_context: /tmp/container-build
@@ -31,7 +31,7 @@
       ansible.builtin.copy:
         content: |
           <html>
-          <head><title>Benekratis Capital - Secure App</title></head>
+          <head><title>Parasol Finance - Secure App</title></head>
           <body>
             <h1>Application Status: Healthy</h1>
             <p>Hardened container built {{ ansible_date_time.iso8601 }}</p>
@@ -70,25 +70,33 @@
         dest: "{{ build_context }}/httpd.conf"
         mode: "0644"
 
+    - name: Ensure podman is installed
+      ansible.builtin.dnf:
+        name: podman
+        state: present
+
     - name: Build container image with Podman
-      containers.podman.podman_image:
-        name: "{{ registry_url }}/{{ container_name }}"
-        tag: "{{ container_tag }}"
-        path: "{{ build_context }}"
-        build:
-          file: Containerfile
-          format: oci
+      ansible.builtin.command:
+        cmd: >-
+          podman build
+          --cgroup-manager=cgroupfs
+          --format oci
+          --tag {{ registry_url }}/{{ container_name }}:{{ container_tag }}
+          --file Containerfile
+          {{ build_context }}
       register: _build_result
+      changed_when: true
 
     - name: Tag image as latest
-      containers.podman.podman_tag:
-        image: "{{ registry_url }}/{{ container_name }}:{{ container_tag }}"
-        target_names:
-          - "{{ registry_url }}/{{ container_name }}:latest"
+      ansible.builtin.command:
+        cmd: >-
+          podman tag
+          {{ registry_url }}/{{ container_name }}:{{ container_tag }}
+          {{ registry_url }}/{{ container_name }}:latest
+      changed_when: true
 
     - name: Report build result
       ansible.builtin.debug:
         msg: |
           Container build complete:
             Image: {{ registry_url }}/{{ container_name }}:{{ container_tag }}
-            ID: {{ _build_result.image.Id | default('built') }}

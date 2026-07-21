@@ -7,7 +7,7 @@ include::partial$_attributes.adoc[]
 
 == Your role and mission
 
-You're a **platform engineer** at **Benekratis Capital**, responsible for the security posture of production RHEL infrastructure. Your team manages customer-facing application servers running `httpd` behind a load balancer.
+You're a **platform engineer** at **Parasol Finance**, responsible for the security posture of production RHEL infrastructure. Your team manages customer-facing application servers running `httpd` behind a load balancer.
 
 This morning, your Splunk Enterprise Security console fires a critical alert: **CVE-2024-38476** — a Server-Side Request Forgery vulnerability in Apache HTTP Server's `mod_rewrite` module — has been detected on your production application server. The CVSS score is **9.8 (Critical)**.
 
@@ -17,7 +17,7 @@ Your CISO needs a response within the hour. Your assignment: use Ansible Automat
 
 == Success criteria for your mission
 
-By the end of this workshop, you'll have practical AAP skills to address Benekratis Capital's vulnerability management requirements:
+By the end of this workshop, you'll have practical AAP skills to address Parasol Finance's vulnerability management requirements:
 
 * **Automated detection response** → EDA rulebook triggers containment within seconds of alert
 * **Zero-touch containment** → Firewall, SELinux, and AIDE deployed without manual SSH
@@ -47,9 +47,9 @@ You should have:
 * Understanding of CVE/advisory concepts (no security expertise required)
 * Access to the lab environment (provided)
 
-== Benekratis Capital's challenges
+== Parasol Finance's challenges
 
-**The situation**: Benekratis Capital processes 2 million transactions daily. Any customer-facing service outage or compromise has immediate regulatory and reputational impact.
+**The situation**: Parasol Finance processes 2 million transactions daily. Any customer-facing service outage or compromise has immediate regulatory and reputational impact.
 
 **Current challenges**:
 

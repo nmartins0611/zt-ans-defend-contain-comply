@@ -89,7 +89,7 @@
         - /etc/httpd/conf.modules.d/10-h2.conf
         - /etc/httpd/conf.modules.d/10-proxy_h2.conf
 
-    - name: Deploy Benekratis Capital landing page
+    - name: Deploy Parasol Finance landing page
       ansible.builtin.copy:
         content: |
           <!DOCTYPE html>

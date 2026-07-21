@@ -1,10 +1,10 @@
 ---
 - name: Scan container image for vulnerabilities
-  hosts: appservers
+  hosts: rhel01
   gather_facts: false
 
   vars:
-    container_name: benekratis-app
+    container_name: parasol-app
     container_tag: latest
     registry_url: "localhost:5000"
     scan_output_dir: /tmp/container-scan-results

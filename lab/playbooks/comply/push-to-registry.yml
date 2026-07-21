@@ -1,10 +1,10 @@
 ---
 - name: Push container image to registry
-  hosts: appservers
+  hosts: rhel01
   gather_facts: false
 
   vars:
-    container_name: benekratis-app
+    container_name: parasol-app
     container_tag: latest
     registry_url: "localhost:5000"
     verify_after_push: true
@@ -75,7 +75,7 @@
     - name: Verify application content
       ansible.builtin.assert:
         that:
-          - "'Benekratis Capital' in _app_health.content"
+          - "'Parasol Finance' in _app_health.content"
         success_msg: "Application container is serving content correctly."
 
     - name: Remove verification container

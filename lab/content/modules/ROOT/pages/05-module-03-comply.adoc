@@ -7,7 +7,7 @@ include::partial$_attributes.adoc[]
 
 toc::[]
 
-The vulnerability is patched and the service is contained. But remediation alone doesn't satisfy Benekratis Capital's compliance requirements — the security team needs **proof** that the system meets organizational baselines, and the application must be delivered as an immutable, scannable container.
+The vulnerability is patched and the service is contained. But remediation alone doesn't satisfy Parasol Finance's compliance requirements — the security team needs **proof** that the system meets organizational baselines, and the application must be delivered as an immutable, scannable container.
 
 In this module you will run a compliance audit against OPA policies, apply CIS-aligned hardening, generate auditable evidence, build a hardened container image, scan it, and push it to registry — all orchestrated by AAP.
 
@@ -28,7 +28,7 @@ By the end of this module, you'll be able to:
 *Why we do this:* Compliance policies define the security baseline your systems must meet. OPA stores these as declarative Rego rules — each control has a clear pass/fail evaluation. Reviewing them first means you understand _what_ the audit will measure: SELinux mode, SSH configuration, file permissions, kernel hardening, unnecessary services. Without this understanding, audit results are just numbers. With it, you can explain every finding to an auditor.
 ====
 
-Before running the audit, examine the policies that define Benekratis Capital's security baselines.
+Before running the audit, examine the policies that define Parasol Finance's security baselines.
 
 . From the terminal, list the OPA policy bundles:
 +
@@ -245,12 +245,7 @@ The post-hardening count should be higher — ideally all controls pass.
 +
 In AAP Controller, launch **COMPLY - Compliance Report**.
 
-. The report is automatically published to the compliance portal on `central`. Open a browser tab to:
-+
-[source]
-----
-http://central:8086/
-----
+. The report is automatically published to the compliance portal. Click the **Compliance Portal** tab in the workshop sidebar to view it.
 +
 Click the report link for this host and date to view the full HTML report with before/after comparison.
 

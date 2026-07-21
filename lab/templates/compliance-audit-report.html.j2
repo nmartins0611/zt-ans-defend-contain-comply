@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Compliance Audit ({{ audit_phase | upper }}) — {{ inventory_hostname }}</title>
+    <style>
+        body { font-family: 'Red Hat Display', 'Segoe UI', sans-serif; margin: 0; padding: 2rem;
+               background: #f5f5f5; color: #1a1a1a; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { color: #ee0000; border-bottom: 2px solid #ee0000; padding-bottom: 0.5rem; }
+        .summary { background: white; padding: 1.5rem; border-radius: 4px; margin: 1rem 0;
+                   box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem; }
+        .stat { text-align: center; padding: 1rem; border-radius: 4px; }
+        .stat .number { font-size: 2rem; font-weight: bold; }
+        .stat .label { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+        .stat-pass { background: #e6f4ea; color: #137333; }
+        .stat-fail { background: #fce8e6; color: #c5221f; }
+        .stat-total { background: #e8f0fe; color: #1a73e8; }
+        .stat-status { background: {{ '#e6f4ea' if audit_result.compliant else '#fce8e6' }}; }
+        .stat-status .number { color: {{ '#137333' if audit_result.compliant else '#c5221f' }}; font-size: 1.2rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 4px; overflow: hidden; }
+        th { background: #4a4a4a; color: white; padding: 0.75rem 1rem; text-align: left; font-size: 0.9rem; }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid #eee; }
+        tr:last-child td { border-bottom: none; }
+        .pass { color: #137333; font-weight: bold; }
+        .fail { color: #c5221f; font-weight: bold; }
+        .category-badge { background: #e8e8e8; color: #4a4a4a; padding: 0.15rem 0.5rem;
+                          border-radius: 3px; font-size: 0.8rem; text-transform: uppercase; }
+        .footer { margin-top: 3rem; font-size: 0.85rem; color: #666;
+                  border-top: 1px solid #ddd; padding-top: 1rem; text-align: center; }
+        .back-link { margin-bottom: 1rem; }
+        .back-link a { color: #0066cc; text-decoration: none; }
+        .back-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-link"><a href="index.html">&larr; Back to all reports</a></div>
+        <h1>Compliance Audit — {{ audit_phase | upper }}-Hardening</h1>
+
+        <div class="summary">
+            <strong>Host:</strong> {{ inventory_hostname }} &mdash;
+            <strong>Date:</strong> {{ ansible_date_time.iso8601 }} &mdash;
+            <strong>Phase:</strong> {{ audit_phase | upper }}
+
+            <div class="summary-grid">
+                <div class="stat stat-status">
+                    <div class="number">{{ 'COMPLIANT' if audit_result.compliant else 'NON-COMPLIANT' }}</div>
+                    <div class="label">Overall Status</div>
+                </div>
+                <div class="stat stat-total">
+                    <div class="number">{{ audit_result.total }}</div>
+                    <div class="label">Total Controls</div>
+                </div>
+                <div class="stat stat-pass">
+                    <div class="number">{{ audit_result.passed }}</div>
+                    <div class="label">Passed</div>
+                </div>
+                <div class="stat stat-fail">
+                    <div class="number">{{ audit_result.failed }}</div>
+                    <div class="label">Failed</div>
+                </div>
+            </div>
+        </div>
+
+{% if audit_result.failed | int > 0 %}
+        <h2>Failed Controls</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Control</th><th>Category</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+{% for control in audit_result.controls if not control.pass %}
+                <tr>
+                    <td><strong>{{ control.id }}</strong></td>
+                    <td>{{ control.name }}</td>
+                    <td><span class="category-badge">{{ control.category }}</span></td>
+                    <td class="fail">FAIL</td>
+                </tr>
+{% endfor %}
+            </tbody>
+        </table>
+{% endif %}
+
+        <h2>All Controls</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Control</th><th>Category</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+{% for control in audit_result.controls %}
+                <tr>
+                    <td><strong>{{ control.id }}</strong></td>
+                    <td>{{ control.name }}</td>
+                    <td><span class="category-badge">{{ control.category }}</span></td>
+                    <td class="{{ 'pass' if control.pass else 'fail' }}">{{ 'PASS' if control.pass else 'FAIL' }}</td>
+                </tr>
+{% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            Generated by DCC Workshop Compliance Audit Pipeline &mdash; {{ ansible_date_time.iso8601 }}
+        </div>
+    </div>
+</body>
+</html>

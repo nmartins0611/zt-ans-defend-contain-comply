@@ -26,7 +26,7 @@
         password: "{{ aap_password }}"
         first_name: Security
         last_name: Engineer
-        email: security_engineer@benekratis.example.com
+        email: security_engineer@parasol.example.com
         is_superuser: false
         state: present
 
@@ -88,6 +88,10 @@
           target_service: httpd
           target_cve: "{{ target_cve }}"
           target_advisory: "{{ target_advisory }}"
+          compliance_portal_url: >-
+            {{ 'https://compliance-' ~ workshop_guid ~ '.' ~ workshop_domain
+               if (workshop_guid | default('')) | length > 0 and (workshop_domain | default('')) | length > 0
+               else 'http://central:' ~ compliance_portal_port }}
         state: present
 
     - name: Add appservers group
@@ -136,7 +140,7 @@
         extra_vars:
           target_cve: "{{ target_cve }}"
           target_advisory: "{{ target_advisory }}"
-        description: "Module 1: Deploy vulnerable httpd and Benekratis Capital portal"
+        description: "Module 1: Deploy vulnerable httpd and Parasol Finance portal"
         state: present
 
     - name: Create job template -- DEFEND - Scan System
