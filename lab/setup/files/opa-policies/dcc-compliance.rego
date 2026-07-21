@@ -6,6 +6,19 @@ import rego.v1
 # Input: JSON object with host facts collected by the compliance-audit playbook.
 
 default compliant := false
+default selinux_enforcing := false
+default firewall_active := false
+default ssh_root_login_disabled := false
+default ssh_x11_forwarding_disabled := false
+default ssh_max_auth_tries_ok := false
+default ssh_client_alive_set := false
+default sysctl_accept_redirects_disabled := false
+default sysctl_send_redirects_disabled := false
+default sysctl_aslr_enabled := false
+default passwd_permissions_ok := false
+default shadow_permissions_ok := false
+default no_unnecessary_services := false
+default no_open_cves := false
 
 # ── SELinux ─────────────────────────────────────────────────────────
 

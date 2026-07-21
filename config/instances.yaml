@@ -238,6 +238,13 @@ virtualmachines:
             protocol: TCP
             targetPort: 8085
             name: errata-repo
+      # ── Compliance Portal ──
+      - name: compliance-portal
+        ports:
+          - port: 8086
+            protocol: TCP
+            targetPort: 8086
+            name: compliance-portal
       # ── OPA ──
       - name: opa-http
         ports:
@@ -278,6 +285,12 @@ virtualmachines:
         tls: true
         tls_termination: Edge
         tls_insecureEdgeTerminationPolicy: Redirect
+      - name: compliance-portal
+        host: compliance
+        service: compliance-portal
+        targetPort: 8086
+        tls: true
+        tls_termination: Edge
       - name: opa-http
         host: opa-http
         service: opa-http
