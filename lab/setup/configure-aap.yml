@@ -60,6 +60,15 @@
           become_username: root
         state: present
 
+    # ── Execution Environments ─────────────────────────────────────────
+    - name: Register Trusted Pipeline EE for container scanning
+      ansible.controller.execution_environment:
+        name: "{{ scan_ee_name }}"
+        organization: "{{ workshop_org }}"
+        image: "{{ scan_ee_image }}"
+        pull: missing
+        state: present
+
     # ── Project ────────────────────────────────────────────────────────
     - name: Create DCC workshop project
       ansible.controller.project:
@@ -354,7 +363,7 @@
         playbook: "lab/playbooks/comply/scan-image.yml"
         inventory: "{{ workshop_inventory_name }}"
         credential: "{{ workshop_credential_name }}"
-        execution_environment: "{{ workshop_ee_name }}"
+        execution_environment: "{{ scan_ee_name }}"
         description: "Module 3: Scan container image for vulnerabilities"
         state: present
 

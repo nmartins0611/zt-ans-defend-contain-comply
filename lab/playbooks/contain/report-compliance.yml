@@ -64,8 +64,55 @@
           listening_ports: "{{ _ports.stdout }}"
           yum_history: "{{ _yum_history.stdout }}"
 
+    - name: Set report filename fact
+      ansible.builtin.set_fact:
+        _report_filename: "{{ inventory_hostname }}-patch-compliance-{{ ansible_date_time.date }}.html"
+        _report_src: "{{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html"
+
+    - name: Push report to central compliance portal
+      ansible.builtin.fetch:
+        src: "{{ _report_src }}"
+        dest: "/tmp/dcc-fetched-reports/{{ _report_filename }}"
+        flat: true
+      changed_when: false
+
+    - name: Copy report to central portal directory
+      ansible.builtin.copy:
+        src: "/tmp/dcc-fetched-reports/{{ _report_filename }}"
+        dest: "/opt/compliance-reports/{{ _report_filename }}"
+        mode: "0644"
+      delegate_to: central
+      become: true
+
     - name: Report location of compliance evidence
       ansible.builtin.debug:
         msg: >-
           Compliance report generated:
           {{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html
+          Portal: http://central:8086/{{ _report_filename }}
+
+- name: Regenerate compliance portal index
+  hosts: central
+  gather_facts: true
+  become: true
+
+  vars:
+    compliance_report_dir: /opt/compliance-reports
+    organization: Benekratis Capital
+
+  tasks:
+    - name: Find all compliance reports
+      ansible.builtin.find:
+        paths: "{{ compliance_report_dir }}"
+        patterns: "*.html"
+        excludes: "index.html"
+      register: _report_files
+
+    - name: Generate portal index page
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/compliance-portal-index.html.j2"
+        dest: "{{ compliance_report_dir }}/index.html"
+        mode: "0644"
+      vars:
+        report_files: "{{ _report_files.files | map(attribute='path') | map('basename') | list }}"
+        generated_at: "{{ ansible_date_time.iso8601 }}"
