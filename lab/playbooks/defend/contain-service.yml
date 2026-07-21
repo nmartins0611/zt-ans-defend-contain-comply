@@ -10,6 +10,29 @@
     external_interface: eth0
 
   tasks:
+    # ── Skip if already contained ─────────────────────────────────────
+    - name: Check current zone for external interface
+      ansible.builtin.command: firewall-cmd --get-zone-of-interface={{ external_interface }}
+      register: _current_zone
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Skip host -- already contained
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: {{ external_interface }} is already in {{ containment_zone }} zone.
+          Skipping containment. Set skip_if_contained=false to force re-run.
+      when:
+        - _current_zone.stdout | default('') == containment_zone
+        - skip_if_contained | default(true) | bool
+
+    - name: End play for already-contained host
+      ansible.builtin.meta: end_host
+      when:
+        - _current_zone.stdout | default('') == containment_zone
+        - skip_if_contained | default(true) | bool
+
     - name: Ensure firewalld and Python bindings are installed
       ansible.builtin.dnf:
         name:

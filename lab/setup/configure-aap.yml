@@ -251,6 +251,39 @@
         description: "Module 2: Generate patch compliance evidence report"
         state: present
 
+    - name: Create job template -- CONTAIN - Update Maintenance Window
+      ansible.controller.job_template:
+        name: "CONTAIN - Update Maintenance Window"
+        organization: "{{ workshop_org }}"
+        project: "{{ workshop_project_name }}"
+        playbook: "lab/playbooks/contain/update-maintenance-window.yml"
+        inventory: "{{ workshop_inventory_name }}"
+        credential: "{{ workshop_credential_name }}"
+        execution_environment: "{{ workshop_ee_name }}"
+        survey_enabled: true
+        survey_spec:
+          name: "Maintenance Window Configuration"
+          description: "Set the allowed maintenance window hours for patching"
+          spec:
+            - question_name: "Window Start Hour"
+              question_description: "Earliest hour patching is allowed (0-23)"
+              variable: "window_start_hour"
+              type: "integer"
+              required: true
+              default: 6
+              min: 0
+              max: 23
+            - question_name: "Window End Hour"
+              question_description: "Latest hour patching is allowed (0-23, must be greater than start)"
+              variable: "window_end_hour"
+              type: "integer"
+              required: true
+              default: 22
+              min: 1
+              max: 23
+        description: "Module 2: Update OPA maintenance window policy for patching gates"
+        state: present
+
     # ── Job Templates (Module 3: COMPLY) ───────────────────────────────
     - name: Create job template -- COMPLY - Compliance Audit
       ansible.controller.job_template:
@@ -544,6 +577,6 @@
             Project:    {{ workshop_project_name }}
             Inventory:  {{ workshop_inventory_name }}
             Credential: {{ workshop_credential_name }}
-            Job Templates:      14 (DEFEND: 4, CONTAIN: 4, COMPLY: 6)
+            Job Templates:      15 (DEFEND: 4, CONTAIN: 5, COMPLY: 6)
             Workflows:          3 (Vulnerability Containment, Policy-Gated Patching, Compliance and Hardening)
             Approval node:      Approve Patch Application (15 min timeout)
