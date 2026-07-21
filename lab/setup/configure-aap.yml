@@ -30,10 +30,10 @@
         is_superuser: false
         state: present
 
-    - name: Grant security_engineer execute role on Default organization
+    - name: Grant security_engineer admin role on Default organization
       ansible.controller.role:
         user: security_engineer
-        role: execute
+        role: admin
         organizations:
           - "{{ workshop_org }}"
         state: present

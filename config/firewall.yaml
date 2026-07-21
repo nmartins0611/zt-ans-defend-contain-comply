@@ -37,6 +37,9 @@ ingress:
   # ── Errata Repo ──
   - protocol: TCP
     port: 8085     # DCC errata yum repo on central
+  # ── Compliance Portal ──
+  - protocol: TCP
+    port: 8086     # DCC compliance report portal on central
   - from:
       - podSelector:
           matchLabels:
@@ -73,6 +76,9 @@ egress:
   # ── Errata Repo ──
   - protocol: TCP
     port: 8085     # DCC errata yum repo on central
+  # ── Compliance Portal ──
+  - protocol: TCP
+    port: 8086     # DCC compliance report portal on central
   - to:
       - podSelector:
           matchLabels:
