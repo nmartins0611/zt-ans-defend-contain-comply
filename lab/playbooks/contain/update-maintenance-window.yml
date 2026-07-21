@@ -1,0 +1,63 @@
+---
+- name: Update OPA maintenance window policy
+  hosts: central
+  gather_facts: false
+  become: true
+
+  vars:
+    opa_policy_file: /opt/opa/policies/dcc-patch-policy.rego
+    opa_host: "http://localhost:8181"
+    window_start_hour: "0"
+    window_end_hour: "23"
+
+  tasks:
+    - name: Validate hour inputs
+      ansible.builtin.assert:
+        that:
+          - window_start_hour | int >= 0
+          - window_start_hour | int <= 23
+          - window_end_hour | int >= 0
+          - window_end_hour | int <= 23
+          - window_start_hour | int < window_end_hour | int
+        fail_msg: >-
+          Invalid window: start={{ window_start_hour }}, end={{ window_end_hour }}.
+          Both must be 0-23 and start must be less than end.
+
+    - name: Read current policy
+      ansible.builtin.slurp:
+        src: "{{ opa_policy_file }}"
+      register: _current_policy
+
+    - name: Update maintenance window start hour
+      ansible.builtin.replace:
+        path: "{{ opa_policy_file }}"
+        regexp: 'hour >= \d+'
+        replace: "hour >= {{ window_start_hour }}"
+
+    - name: Update maintenance window end hour
+      ansible.builtin.replace:
+        path: "{{ opa_policy_file }}"
+        regexp: 'hour < \d+'
+        replace: "hour < {{ window_end_hour }}"
+
+    - name: Reload policy into OPA via API
+      ansible.builtin.uri:
+        url: "{{ opa_host }}/v1/policies/dcc-patch-policy"
+        method: PUT
+        src: "{{ opa_policy_file }}"
+        headers:
+          Content-Type: text/plain
+        status_code: [200]
+
+    - name: Verify policy is loaded
+      ansible.builtin.uri:
+        url: "{{ opa_host }}/v1/data/dcc/patch_policy/gate_results/maintenance_window"
+        method: GET
+        return_content: true
+      register: _verify
+
+    - name: Report updated maintenance window
+      ansible.builtin.debug:
+        msg: >-
+          Maintenance window updated to {{ window_start_hour }}:00 – {{ window_end_hour }}:00.
+          Policy reloaded into OPA.

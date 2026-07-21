@@ -7,6 +7,37 @@
     aide_db_path: /var/lib/aide/aide.db.gz
 
   tasks:
+    # ── Skip if already hardened ──────────────────────────────────────
+    - name: Check if SELinux httpd booleans are already hardened
+      ansible.builtin.command: getsebool httpd_can_network_connect
+      register: _sebool_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if AIDE is already configured
+      ansible.builtin.command: crontab -l
+      register: _cron_check
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Skip host -- already hardened
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: SELinux booleans enforced and AIDE active.
+          Skipping hardening. Set skip_if_hardened=false to force re-run.
+      when:
+        - "'off' in (_sebool_check.stdout | default(''))"
+        - "'aide' in (_cron_check.stdout | default(''))"
+        - skip_if_hardened | default(true) | bool
+
+    - name: End play for already-hardened host
+      ansible.builtin.meta: end_host
+      when:
+        - "'off' in (_sebool_check.stdout | default(''))"
+        - "'aide' in (_cron_check.stdout | default(''))"
+        - skip_if_hardened | default(true) | bool
+
     - name: Enforce SELinux booleans for httpd containment
       ansible.posix.seboolean:
         name: "{{ item.name }}"
