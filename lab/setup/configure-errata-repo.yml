@@ -37,7 +37,7 @@
           httpd-core-{{ patched_httpd_version }}
           httpd-filesystem-{{ patched_httpd_version }}
           httpd-tools-{{ patched_httpd_version }}
-          mod_ssl
+          mod_ssl-{{ patched_httpd_version }}
       when: _existing_rpms.matched == 0
       register: _download_result
       changed_when: _download_result.rc == 0
