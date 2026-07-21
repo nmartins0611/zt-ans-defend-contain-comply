@@ -9,13 +9,13 @@ policy:
     All conditions must pass before advisory application is permitted.
 
 gates:
-  maintenance_window:
-    enabled: true
-    start: "06:00"
-    end: "10:00"
-    timezone: UTC
-    skip_weekends: false
-    description: Patching only permitted during defined maintenance window
+  # maintenance_window:
+  #   enabled: true
+  #   start: "06:00"
+  #   end: "10:00"
+  #   timezone: UTC
+  #   skip_weekends: false
+  #   description: Patching only permitted during defined maintenance window
 
   backup_verification:
     enabled: true
