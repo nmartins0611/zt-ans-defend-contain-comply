@@ -38,6 +38,15 @@
           - "{{ workshop_org }}"
         state: present
 
+    - name: Grant security_engineer approve role on Policy-Gated Patching workflow
+      ansible.controller.role:
+        user: security_engineer
+        role: approve
+        workflows:
+          - "Policy-Gated Patching"
+        state: present
+      ignore_errors: true
+
     # ── Credential ─────────────────────────────────────────────────────
     - name: Create machine credential for app server
       ansible.controller.credential:
