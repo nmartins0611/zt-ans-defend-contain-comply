@@ -187,6 +187,7 @@ AAP Controller can enforce OPA policies as execution gates. You will configure a
 +
 This policy uses the `aap.gateway` package — the standard contract for AAP 2.6 platform policies. It checks `input.created_by.username` (the AAP user who launched the job) and classifies the template name. Any template containing "patch" requires the user to be in the `_authorized_patch_users` set — currently only `security_engineer`.
 +
+
 The output contract is `{"allowed": bool, "violations": [strings]}` — AAP reads `allowed` to gate execution and displays `violations` to the user.
 
 . In AAP Controller, navigate to **Settings → Automation Execution → Policy** and click onthe pencil to edit the settings.
@@ -219,9 +220,6 @@ This is the key insight: even though `admin` has full AAP permissions, **the pla
 
 . Log back in as the security engineer:
 
-. Navigate to **Automation Execution → Templates** and launch the **Policy-Gated Patching** workflow again.
-+
-This time, the policy gate passes — `security_engineer` is in the authorized set. The workflow starts and proceeds to the pre-patch system checks.
 
 == Exercise 5: Execute the Patching Workflow
 
@@ -235,6 +233,9 @@ Stay logged in as `security_engineer` — the execution policy you configured in
 . In AAP Controller, navigate to **Automation Execution → Templates** and find the **Policy-Gated Patching** workflow you just created.
 
 . Click the rocket icon to **Launch** the workflow.
+
++
+This time, the policy gate passes — `security_engineer` is in the authorized set. The workflow starts and proceeds to the pre-patch system checks.
 
 . Watch the first node (**CONTAIN - Pre-Patch Check**) execute. It will:
 +
