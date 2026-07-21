@@ -420,7 +420,7 @@ The AAP credential, project, and decision environment are already configured. Yo
 
 [NOTE.why]
 ====
-*Why we do this:* This simulates a common real-world scenario: the same vulnerable software gets deployed to a second server — a scale-out, a DR replica, or a developer spinning up a new instance from the same golden image. The Scan System job detects the CVE and reports it to Splunk, seeding the SIEM with detection events for this new host. This is the trigger data that will flow through to EDA.
+*Why we do this:* This simulates a common real-world scenario: the same vulnerable software gets deployed to a second server — a scale-out, a DR replica, or a developer spinning up a new instance from the same golden image. Automated system Scans detect the CVE and reports it to Splunk, seeding the SIEM with detection events for this new host. This is the trigger data that will flow through to EDA.
 ====
 
 Now deploy the same vulnerable application to a second server.

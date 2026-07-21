@@ -38,14 +38,6 @@
           - "{{ workshop_org }}"
         state: present
 
-    - name: Grant security_engineer approve role on Policy-Gated Patching workflow
-      ansible.controller.role:
-        user: security_engineer
-        role: approve
-        workflows:
-          - "Policy-Gated Patching"
-        state: present
-      ignore_errors: true
 
     # ── Credential ─────────────────────────────────────────────────────
     - name: Create machine credential for app server
@@ -419,16 +411,37 @@
           - harden
         state: present
 
-    # ── Workflow: Policy-Gated Patching (attendees build this in the UI) ─
+    # ── Workflow: Policy-Gated Patching (empty shell; attendees add nodes in the UI) ─
     - name: Create workflow -- Policy-Gated Patching
       ansible.controller.workflow_job_template:
         name: "Policy-Gated Patching"
         organization: "{{ workshop_org }}"
         inventory: "{{ workshop_inventory_name }}"
         state: present
-      tags:
-        - patching_workflow
-        - never
+
+    - name: Grant security_engineer admin role on Policy-Gated Patching
+      ansible.controller.role:
+        user: security_engineer
+        role: admin
+        workflows:
+          - "Policy-Gated Patching"
+        state: present
+
+    - name: Grant security_engineer approve role on Policy-Gated Patching
+      ansible.controller.role:
+        user: security_engineer
+        role: approve
+        workflows:
+          - "Policy-Gated Patching"
+        state: present
+
+    - name: Grant security_engineer execute role on Policy-Gated Patching
+      ansible.controller.role:
+        user: security_engineer
+        role: execute
+        workflows:
+          - "Policy-Gated Patching"
+        state: present
 
     - name: Build Policy-Gated Patching workflow nodes
       ansible.controller.workflow_job_template_node:
