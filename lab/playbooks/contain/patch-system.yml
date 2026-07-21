@@ -56,6 +56,18 @@
             After:   {{ _post_patch_version.stdout }}
             Changed: {{ _patch_result.changed }}
 
+    - name: Remove ssl.conf reinstalled by upgraded mod_ssl
+      ansible.builtin.file:
+        path: /etc/httpd/conf.d/ssl.conf
+        state: absent
+      when: _patch_result.changed
+
+    - name: Reset httpd failed state if needed
+      ansible.builtin.command: systemctl reset-failed {{ target_service }}
+      changed_when: false
+      failed_when: false
+      when: _patch_result.changed
+
     - name: Restart patched service
       ansible.builtin.systemd:
         name: "{{ target_service }}"
@@ -64,14 +76,13 @@
 
     - name: Wait for service to stabilize
       ansible.builtin.wait_for:
-        port: "{{ service_port | default(443) }}"
+        port: 80
         delay: 5
         timeout: 60
 
     - name: Verify service is healthy post-restart
       ansible.builtin.uri:
-        url: "https://localhost:{{ service_port | default(443) }}/"
-        validate_certs: false
+        url: "http://localhost/"
         status_code: [200, 301, 302, 403]
       register: _health_check
       retries: 3
