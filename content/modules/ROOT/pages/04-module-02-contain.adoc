@@ -70,13 +70,17 @@ The patch policy defines clear, automatable prerequisites. The backup marker exi
 
 You will write a playbook that gathers system facts, sends them to OPA for evaluation, and blocks patching if any policy gates fail. A skeleton file with detailed instructions has been provided.
 
-. First, we need to look at what the policy actually is. Go the *Gitea* tab, navigate to `lab/policies/patch-policy.yml` and read through the Rego policy. The company policy will check for:
-
+. First, we need to look at what the policy actually is. Go the *Gitea* tab, navigate to `lab/policies/patch-policy.yml` and read through the Rego policy. 
+. The company policy will check for:
++
+[Policy checks]
+====
 . Maintenance Window
 . Backup Verification
 . Disk Space
 . Service Health
 . Change Approval in AAP
+====
 
 . In the *Gitea* tab, navigate to `lab/playbooks/contain/pre-patch-check.yml` and read through the playbook. Uncomment the **Query OPA patch policy** task. 
 
@@ -91,7 +95,6 @@ You will write a playbook that gathers system facts, sends them to OPA for evalu
 ====
 
 . Commit your changes in Gitea, then sync the project in AAP Controller (*Automation Execution → Projects → DCC Workshop → Sync*). Test by launching the *CONTAIN - Pre-Patch Check* job template.
-
 
 
 == Exercise 3: Build the Patching Workflow in AAP Controller
@@ -113,31 +116,31 @@ Now construct the workflow that chains the policy check, approval, patching, and
 * Organization: `Default`
 * Inventory: `DCC Workshop`
 * Leave all other settings at their defaults
-* Click **Save**
+* Click **Create Workflow Template**
 
 . After saving, you'll be taken to the workflow details page. Click the **Visualizer** tab to open the visual workflow editor.
 
-. You'll see an empty canvas with a **Start** node. Click the **Start** node to add the first step.
+. You'll see an empty canvas with a **Add step** node. Click the **Add step** node to add the first step.
 
 . **Add Node 1 — Pre-Patch Check:**
 +
 * In the dialog that appears, select **Job Template** as the node type
 * Search for and select **CONTAIN - Pre-Patch Check**
-* Click **Save**
+* Click **Next** and **Finsih**
 
 . **Add Node 2 — Approval Gate:**
 +
-* Hover over the **CONTAIN - Pre-Patch Check** node and click the **+** icon that appears
-* Select **On Success** as the link type
+* Hover over the **CONTAIN - Pre-Patch Check** node and click the **three dots/options** icon that appears
 * Select **Approval** as the node type
 * Name: `Approve Patch Application`
 * Description: `Security team approval required before applying {target_advisory}`
 * Timeout: `900` seconds (15 minutes)
-* Click **Save**
+* Select **Run on success** on the Status field.
+* Click **Next** and **Finish**.
 
 . **Add Node 3 — Patch System:**
 +
-* Hover over the **Approve Patch Application** node and click the **+** icon
+* Hover over the **Approve Patch Application** node and click the **three dots/options** icon
 * Select **On Approve** as the link type
 * Select **Job Template** as the node type
 * Search for and select **CONTAIN - Patch System**
@@ -146,16 +149,16 @@ Now construct the workflow that chains the policy check, approval, patching, and
 . **Add Node 4 — Post-Patch Verify:**
 +
 * Hover over the **CONTAIN - Patch System** node and click the **+** icon
-* Select **On Success** as the link type
 * Select **Job Template** → **CONTAIN - Post-Patch Verify**
-* Click **Save**
+* Select **On Success** for the status field.
+* Click **Next** and **Finish**
 
 . **Add Node 5 — Report Compliance:**
 +
-* Hover over the **CONTAIN - Post-Patch Verify** node and click the **+** icon
-* Select **On Success** as the link type
+* Hover over the **CONTAIN - Post-Patch Verify** node and click the **three dots/options** icon
 * Select **Job Template** → **CONTAIN - Report Compliance**
-* Click **Save**
+* Select **On Success** as the link type
+* Click **Next** and **Finish**
 
 . Review the completed workflow. The visualizer should show:
 +
@@ -188,11 +191,10 @@ The output contract is `{"allowed": bool, "violations": [strings]}` — AAP read
 
 . In AAP Controller, navigate to **Settings → Automation Execution → Policy** and click onthe pencil to edit the settings.
 
-. Click **Create policy** and configure:
+. Configure OPA settings:
 +
 
-* OPA Server hostname: `central`
-* OPA server URL: `http://central:8181/v1/data/dcc/execution_policy/result`
+* OPA Server hostname: `192.168.1.11`
 * Click **save**
 
 . Next navigate to **Access Management → Organizations**, and click on the pencil to edit **Default**. Configure the **Policy Enforcement** path to be: `aap/gateway/decision`.
@@ -208,12 +210,14 @@ AAP blocks the launch — the policy gate denies `admin`. Note the difference fr
 This is the key insight: even though `admin` has full AAP permissions, **the platform refuses to execute the workflow**. RBAC controls what you can click; Policy-as-Code controls what the automation is allowed to do. Defense in depth.
 ====
 
-. Log out of AAP Controller (click the user icon in the top right → **Log out**).
-
-. Log back in as the security engineer:
+. We should set the password of the security_engineer, navigate to **Authentication Methods → Users**, and click on the pencil to edit the user. Set the password to:
 +
 * Username: `security_engineer`
 * Password: `ansible123!`
+
+. Log out of AAP Controller (click the user icon in the top right → **Log out**).
+
+. Log back in as the security engineer:
 
 . Navigate to **Automation Execution → Templates** and launch the **Policy-Gated Patching** workflow again.
 +
