@@ -243,6 +243,11 @@ Stay logged in as `security_engineer` — the execution policy you configured in
 * Display PASS/FAIL for each gate
 +
 If all system gates pass, the workflow proceeds to the approval node. We expect however that the workflow fails since rhel01 was backed up but not rhel02. Run the command to simulate the backup on rhel02 in **Terminal**.
++
+[TIP]
+====
+If the **maintenance_window** gate fails (because the current hour is outside the 6:00–22:00 window), you can adjust it using the **CONTAIN - Update Maintenance Window** job template in AAP. It has a survey that lets you set the start and end hours. This updates the OPA policy in real time without restarting any services.
+====
 
 +
 [source,role="execute"]
@@ -309,7 +314,16 @@ ssh rhel01 sudo systemctl status httpd --no-pager
 
 The final workflow node generated an HTML compliance report.
 
-. From the terminal, check the report was generated on rhel01:
+. The compliance report is automatically published to the central compliance portal. Open a browser tab to:
++
+[source]
+----
+http://central:8086/
+----
++
+You should see the report listed on the portal index page. Click the report link to view the full HTML report.
+
+. You can also check the report directly on rhel01:
 +
 [source,role="execute"]
 ----

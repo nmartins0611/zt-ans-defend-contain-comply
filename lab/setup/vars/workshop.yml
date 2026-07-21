@@ -41,6 +41,8 @@ workshop_project_name: "Defend, Contain, Comply"
 workshop_inventory_name: "DCC Workshop"
 workshop_credential_name: "DCC App Server"
 workshop_ee_name: "Default execution environment"
+scan_ee_name: "Trusted Pipeline EE"
+scan_ee_image: "quay.io/nmartins/trusted-pipeline-ee:latest"
 
 # Gitea SCM
 gitea_url: "http://gitea:3000"
@@ -55,6 +57,11 @@ splunk_container_name: splunk
 splunk_image: docker.io/splunk/splunk:latest
 splunk_hec_token: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 splunk_data_dir: /opt/splunk-data
+
+# Compliance report portal served from central VM
+compliance_report_dir: /opt/compliance-reports
+compliance_portal_port: 8086
+compliance_portal_service_name: dcc-compliance-portal
 
 # OPA container
 opa_container_name: opa

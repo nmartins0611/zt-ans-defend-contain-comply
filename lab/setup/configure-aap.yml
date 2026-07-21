@@ -38,6 +38,15 @@
           - "{{ workshop_org }}"
         state: present
 
+    - name: Grant security_engineer approve role on Policy-Gated Patching workflow
+      ansible.controller.role:
+        user: security_engineer
+        role: approve
+        workflows:
+          - "Policy-Gated Patching"
+        state: present
+      ignore_errors: true
+
     # ── Credential ─────────────────────────────────────────────────────
     - name: Create machine credential for app server
       ansible.controller.credential:
@@ -49,6 +58,15 @@
           password: "{{ aap_password }}"
           become_method: sudo
           become_username: root
+        state: present
+
+    # ── Execution Environments ─────────────────────────────────────────
+    - name: Register Trusted Pipeline EE for container scanning
+      ansible.controller.execution_environment:
+        name: "{{ scan_ee_name }}"
+        organization: "{{ workshop_org }}"
+        image: "{{ scan_ee_image }}"
+        pull: missing
         state: present
 
     # ── Project ────────────────────────────────────────────────────────
@@ -345,7 +363,7 @@
         playbook: "lab/playbooks/comply/scan-image.yml"
         inventory: "{{ workshop_inventory_name }}"
         credential: "{{ workshop_credential_name }}"
-        execution_environment: "{{ workshop_ee_name }}"
+        execution_environment: "{{ scan_ee_name }}"
         description: "Module 3: Scan container image for vulnerabilities"
         state: present
 

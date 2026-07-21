@@ -42,7 +42,7 @@
 
     - name: Reload policy into OPA via API
       ansible.builtin.uri:
-        url: "{{ opa_host }}/v1/policies/dcc-patch-policy"
+        url: "{{ opa_host }}/v1/policies/policies/dcc-patch-policy.rego"
         method: PUT
         src: "{{ opa_policy_file }}"
         headers:
