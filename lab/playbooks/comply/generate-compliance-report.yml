@@ -30,8 +30,8 @@
 
     - name: Parse audit results
       ansible.builtin.set_fact:
-        pre_audit: "{{ (_pre_audit_raw.content | b64decode | from_json) if _pre_audit_raw is succeeded else {} }}"
-        post_audit: "{{ (_post_audit_raw.content | b64decode | from_json) if _post_audit_raw is succeeded else {} }}"
+        pre_audit: "{{ (_pre_audit_raw.content | b64decode | from_json) if _pre_audit_raw.content is defined else {} }}"
+        post_audit: "{{ (_post_audit_raw.content | b64decode | from_json) if _post_audit_raw.content is defined else {} }}"
 
     - name: Gather current system evidence
       ansible.builtin.command:
