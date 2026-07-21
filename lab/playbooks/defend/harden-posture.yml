@@ -38,6 +38,11 @@
         - "'aide' in (_cron_check.stdout | default(''))"
         - skip_if_hardened | default(true) | bool
 
+    - name: Ensure SELinux is in enforcing mode
+      ansible.posix.selinux:
+        policy: targeted
+        state: enforcing
+
     - name: Enforce SELinux booleans for httpd containment
       ansible.posix.seboolean:
         name: "{{ item.name }}"
