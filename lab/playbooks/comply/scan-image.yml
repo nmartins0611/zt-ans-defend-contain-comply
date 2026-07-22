@@ -1,10 +1,10 @@
 ---
 - name: Scan container image for vulnerabilities
-  hosts: appservers
+  hosts: rhel01
   gather_facts: false
 
   vars:
-    container_name: benekratis-app
+    container_name: parasol-app
     container_tag: latest
     registry_url: "localhost:5000"
     scan_output_dir: /tmp/container-scan-results
@@ -74,7 +74,7 @@
     - name: Check for known vulnerable packages in image
       ansible.builtin.command:
         cmd: >-
-          podman run --rm --entrypoint=""
+          podman --cgroup-manager=cgroupfs run --rm --entrypoint=""
           {{ registry_url }}/{{ container_name }}:{{ container_tag }}
           rpm -qa --qf '%{NAME}-%{VERSION}-%{RELEASE}\n'
       register: _image_packages

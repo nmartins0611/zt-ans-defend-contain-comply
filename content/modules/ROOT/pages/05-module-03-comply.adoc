@@ -7,7 +7,7 @@ include::partial$_attributes.adoc[]
 
 toc::[]
 
-The vulnerability is patched and the service is contained. But remediation alone doesn't satisfy Benekratis Capital's compliance requirements — the security team needs **proof** that the system meets organizational baselines, and the application must be delivered as an immutable, scannable container.
+The vulnerability is patched and the service is contained. But remediation alone doesn't satisfy Parasol Finance's compliance requirements — the security team needs **proof** that the system meets organizational baselines, and the application must be delivered as an immutable, scannable container.
 
 In this module you will run a compliance audit against OPA policies, apply CIS-aligned hardening, generate auditable evidence, build a hardened container image, scan it, and push it to registry — all orchestrated by AAP.
 
@@ -28,9 +28,28 @@ By the end of this module, you'll be able to:
 *Why we do this:* Compliance policies define the security baseline your systems must meet. OPA stores these as declarative Rego rules — each control has a clear pass/fail evaluation. Reviewing them first means you understand _what_ the audit will measure: SELinux mode, SSH configuration, file permissions, kernel hardening, unnecessary services. Without this understanding, audit results are just numbers. With it, you can explain every finding to an auditor.
 ====
 
-Before running the audit, examine the policies that define Benekratis Capital's security baselines.
+Before running the audit, examine the policies that define Parasol Finance's security baselines.
 
-. From the terminal, list the OPA policy bundles:
+. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-compliance.rego`. Read through the Rego policy carefully.
++
+Notice the structure:
++
+* Each control is a separate Rego rule (e.g. `selinux_enforcing`, `ssh_root_login_disabled`)
+* Every rule has a `default := false` declaration — if the condition isn't met, the control fails
+* The `controls` array assembles all rules into a structured list with IDs, names, and categories
+* The `result` object returns the overall compliance status, pass/fail counts, and per-control details
+
+. Identify the 13 controls and their categories:
++
+* **SELinux** — Is enforcement mode active?
+* **Firewall** — Is firewalld running?
+* **SSH** — Root login, X11 forwarding, max auth tries, idle timeout
+* **Kernel** — ICMP redirects, send redirects, ASLR
+* **File permissions** — `/etc/passwd`, `/etc/shadow`
+* **Services** — Unnecessary services (`rpcbind`) should be disabled
+* **Vulnerability** — No open CVEs
+
+. From the terminal, verify OPA has the compliance policy loaded:
 +
 [source,role="execute"]
 ----
@@ -42,26 +61,9 @@ for p in data.get('result', []):
 "
 ----
 +
-You should see policies covering SELinux, firewall, SSH, services, and kernel parameters.
+You should see `policies/dcc-compliance.rego` in the list.
 
-. Examine the full compliance policy (the policy ID uses the file path, not the Rego package name):
-+
-[source,role="execute"]
-----
-curl -s http://central:8181/v1/policies/policies%2Fdcc-compliance.rego | python3 -m json.tool
-----
-+
-Note the 13 controls: each evaluates a specific security baseline and returns pass/fail.
-
-. Take a moment to identify the categories covered:
-+
-* **SELinux** — Is enforcement mode active?
-* **SSH** — Root login, X11 forwarding, max auth tries, idle timeout
-* **File permissions** — `/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/gshadow`
-* **Kernel** — ICMP redirects, ASLR (address space layout randomization)
-* **Services** — Unnecessary services (`rpcbind`, `avahi-daemon`) should be disabled
-
-. You can also query a single control to see its evaluation logic. For example, test the SELinux control:
+. Test a single control to see how the input/output contract works:
 +
 [source,role="execute"]
 ----
@@ -70,12 +72,12 @@ curl -s -X POST http://central:8181/v1/data/dcc/compliance/result \
   -d '{"input": {"selinux_mode": "Enforcing"}}' | python3 -m json.tool
 ----
 +
-Try changing `"Enforcing"` to `"Permissive"` and see how the result changes.
+Try changing `"Enforcing"` to `"Permissive"` and see how the result changes. Ansible provides the full set of system facts as input; OPA returns pass/fail per control.
 
 === Verify
 
-* OPA has loaded policy bundles that define auditable security baselines
-* You can identify the 13 controls and their categories
+* The compliance policy is loaded in OPA (`policies/dcc-compliance.rego`)
+* You can identify the 13 controls and their categories in the Rego source
 * You understand the input/output contract: Ansible provides system facts, OPA returns pass/fail per control
 
 == Exercise 2: Run the Pre-Hardening Compliance Audit
@@ -96,51 +98,23 @@ Click the rocket icon to **Launch**. When prompted for extra variables, ensure `
 audit_phase: pre
 ----
 +
-. Wait for the job to complete. The playbook gathers system facts from the target host, sends them to OPA for evaluation, and writes the results to a JSON file.
+. Wait for the job to complete. The playbook gathers system facts from the target host, sends them to OPA for evaluation, generates an HTML audit report, and pushes it to the compliance portal.
 
-. Review the audit results on rhel01:
+. Click the **Compliance Portal** tab in the workshop sidebar. You should see a new audit report listed (e.g. `rhel01-audit-pre-2026-07-21.html`). Click it to view the full report.
 +
-[source,role="execute"]
-----
-ssh rhel01 'cat /tmp/compliance-reports/audit-results-pre.json | python3 -m json.tool'
-----
+The report shows:
 +
-Each control shows `pass` or `fail` with the control ID and category.
-
-. Check the summary counts:
-+
-[source,role="execute"]
-----
-ssh rhel01 "python3 -c '
-import json
-data = json.load(open(\"/tmp/compliance-reports/audit-results-pre.json\"))
-controls = data.get(\"controls\", [])
-passed = sum(1 for c in controls if c.get(\"pass\"))
-failed = sum(1 for c in controls if not c.get(\"pass\"))
-print(f\"Controls: {passed} passed, {failed} failed, {len(controls)} total\")
-'"
-----
-
-. Identify which controls failed — these are the ones the CIS hardening will remediate:
-+
-[source,role="execute"]
-----
-ssh rhel01 "python3 -c '
-import json
-data = json.load(open(\"/tmp/compliance-reports/audit-results-pre.json\"))
-for c in data.get(\"controls\", []):
-    status = \"PASS\" if c.get(\"pass\") else \"FAIL\"
-    print(f\"  [{status}] {c.get(\"id\", \"unknown\")}: {c.get(\"description\", \"\")}\")
-'"
-----
+* A summary grid with overall status, total controls, passed, and failed counts
+* A **Failed Controls** table highlighting exactly which controls need remediation
+* A **All Controls** table with PASS/FAIL status for every control
 +
 Some controls may already pass from Module 1 hardening (e.g., SELinux). Others require CIS-level remediation.
 
 === Verify
 
-* The audit completed and produced a structured JSON report at `/tmp/compliance-reports/audit-results-pre.json`
+* The audit completed and published an HTML report to the compliance portal
 * You can see which controls passed and which failed
-* The `fail` entries identify exactly what needs to be fixed in the next exercise
+* The failed controls identify exactly what needs to be fixed in the next exercise
 
 == Exercise 3: Apply CIS Hardening
 
@@ -225,55 +199,25 @@ In AAP Controller, launch **COMPLY - Compliance Audit** again. Set the extra var
 audit_phase: post
 ----
 
-. Compare before and after:
+. Click the **Compliance Portal** tab. You should now see both the pre-hardening and post-hardening audit reports. Open both and compare:
 +
-[source,role="execute"]
-----
-ssh rhel01 "python3 -c '
-import json
-for phase in [\"pre\", \"post\"]:
-    data = json.load(open(f\"/tmp/compliance-reports/audit-results-{phase}.json\"))
-    controls = data.get(\"controls\", [])
-    passed = sum(1 for c in controls if c.get(\"pass\"))
-    print(f\"{phase.upper()}-HARDENING: {passed}/{len(controls)} controls passed\")
-'"
-----
+* The **pre-hardening** report shows several failed controls (SSH, kernel, file permissions, services)
+* The **post-hardening** report should show all controls passing — the CIS hardening fixed them
 +
-The post-hardening count should be higher — ideally all controls pass.
+This before/after comparison is the evidence auditors require.
 
 . Generate the full HTML compliance report:
 +
 In AAP Controller, launch **COMPLY - Compliance Report**.
 
-. The report is automatically published to the compliance portal on `central`. Open a browser tab to:
-+
-[source]
-----
-http://central:8086/
-----
-+
-Click the report link for this host and date to view the full HTML report with before/after comparison.
-
-. You can also verify the report was generated locally:
-+
-[source,role="execute"]
-----
-ssh rhel01 ls -la /tmp/compliance-reports/compliance-report-*.html
-----
-
-. Examine the report content to confirm it contains before/after data:
-+
-[source,role="execute"]
-----
-ssh rhel01 'cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "Advisory|SELinux|Controls|PASS|FAIL" | head -20'
-----
+. Return to the **Compliance Portal** tab and refresh. You should now see a compliance report alongside the audit reports. Click it to view the full before/after evidence including package versions, SELinux status, firewall configuration, and SSH hardening.
 
 === Verify
 
-* All controls pass in the post-hardening audit
-* The HTML report contains before/after comparison with control-level detail
-* The report includes timestamps, system identifiers, and remediation actions
-* The report is suitable for auditor review
+* All controls pass in the post-hardening audit report
+* The compliance portal shows audit (pre/post) and compliance reports side by side
+* The reports include timestamps, system identifiers, and per-control results
+* All evidence is browsable from the portal — no terminal access needed
 
 == Exercise 5: Build the Hardened Container Image
 
@@ -301,7 +245,7 @@ Review the key security properties:
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo podman images | grep dcc
+ssh rhel01 sudo podman images
 ----
 +
 You should see an image tagged with the advisory reference.
@@ -323,7 +267,7 @@ for k, v in labels.items():
 +
 [source,role="execute"]
 ----
-ssh rhel01 'sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}" | grep dcc'
+ssh rhel01 'sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}"'
 ----
 
 === Verify
@@ -414,7 +358,7 @@ ssh rhel01 ls -la /tmp/compliance-reports/compliance-report-*.html
 
 echo ""
 echo "=== Container Image ==="
-ssh rhel01 sudo podman images | grep dcc
+ssh rhel01 sudo podman images
 
 echo ""
 echo "=== Registry Catalog ==="

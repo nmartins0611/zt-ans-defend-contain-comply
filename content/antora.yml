@@ -15,7 +15,7 @@ asciidoc:
     ssh_command: ssh rhel@control
     target_cve: CVE-2024-38476
     target_advisory: RHSA-2024:5138
-    company_name: Benekratis Capital
+    company_name: Parasol Finance
     page-links:
     - url: https://redhat.com
       text: Red Hat

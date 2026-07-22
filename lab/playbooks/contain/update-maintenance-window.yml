@@ -40,11 +40,16 @@
         regexp: 'hour < \d+'
         replace: "hour < {{ window_end_hour }}"
 
+    - name: Read updated policy file
+      ansible.builtin.slurp:
+        src: "{{ opa_policy_file }}"
+      register: _updated_policy
+
     - name: Reload policy into OPA via API
       ansible.builtin.uri:
         url: "{{ opa_host }}/v1/policies/policies/dcc-patch-policy.rego"
         method: PUT
-        src: "{{ opa_policy_file }}"
+        body: "{{ _updated_policy.content | b64decode }}"
         headers:
           Content-Type: text/plain
         status_code: [200]

@@ -9,7 +9,7 @@ toc::[]
 
 Red Hat has published **RHSA-2024:5138** — a security advisory addressing CVE-2024-38476 in Apache HTTP Server. A patched `httpd` package is now available in your repositories.
 
-However, Benekratis Capital's change management policy requires that patches pass several gates before application: backup verification, maintenance window check, approval, and post-patch compliance validation.
+However, Parasol Finance's change management policy requires that patches pass several gates before application: backup verification, maintenance window check, approval, and post-patch compliance validation.
 
 In this module you will build and execute a policy-gated patching workflow in AAP Controller.
 
@@ -30,7 +30,7 @@ By the end of this module, you'll be able to:
 *Why we do this:* In regulated environments, you can't just apply patches whenever you want. Change management policies exist because rushed patches cause outages. OPA (Open Policy Agent) codifies these policies so they can be evaluated automatically: Is there a recent backup? Are we in a maintenance window? Is there enough disk space? Is the service healthy? Policy-as-code means the rules are version-controlled, auditable, and consistently enforced — no more "I thought it was OK to patch during business hours."
 ====
 
-Before writing the playbook, understand the policies that govern patching at Benekratis Capital.
+Before writing the playbook, understand the policies that govern patching at Parasol Finance.
 
 . Open the *Gitea* tab and navigate to `lab/policies/patch-policy.yml` to review the patch policy definition.
 +
@@ -70,11 +70,8 @@ The patch policy defines clear, automatable prerequisites. The backup marker exi
 
 You will write a playbook that gathers system facts, sends them to OPA for evaluation, and blocks patching if any policy gates fail. A skeleton file with detailed instructions has been provided.
 
-. First, we need to look at what the policy actually is. Go the *Gitea* tab, navigate to `lab/policies/patch-policy.yml` and read through the Rego policy. 
-. The company policy will check for:
+. Go the *Gitea* tab, navigate to `lab/policies/patch-policy.yml` and read through the Rego policy. The company policy will check for:
 +
-[Policy checks]
-====
 . Maintenance Window
 . Backup Verification
 . Disk Space
@@ -83,16 +80,6 @@ You will write a playbook that gathers system facts, sends them to OPA for evalu
 ====
 
 . In the *Gitea* tab, navigate to `lab/playbooks/contain/pre-patch-check.yml` and read through the playbook. Uncomment the **Query OPA patch policy** task. 
-
-+
-[TIP]
-====
-. We use `ansible.builtin.stat` to get the backup marker's mtime, then calculate age in hours
-. We use `ansible.builtin.systemd` to check httpd's ActiveState
-. We get free disk space from `ansible_mounts` (filter for `mount == "/"`, divide `size_available` by 1073741824)
-. We POST the four values to `http://central:8181/v1/data/dcc/patch_policy/result` using `ansible.builtin.uri`
-. We use `ansible.builtin.fail` with `when: not _opa_response.json.result.allow_patch` to enforce the policy
-====
 
 . Commit your changes in Gitea, then sync the project in AAP Controller (*Automation Execution → Projects → DCC Workshop → Sync*). Test by launching the *CONTAIN - Pre-Patch Check* job template.
 
@@ -183,26 +170,23 @@ CONTAIN - Pre-Patch Check → Approve Patch Application → CONTAIN - Patch Syst
 
 AAP Controller can enforce OPA policies as execution gates. You will configure a policy that blocks the patching workflow unless it's launched by an authorized security engineer.
 
-. First, examine the execution policy. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-execution-policy.rego`.
-+
-This policy uses the `aap.gateway` package — the standard contract for AAP 2.6 platform policies. It checks `input.created_by.username` (the AAP user who launched the job) and classifies the template name. Any template containing "patch" requires the user to be in the `_authorized_patch_users` set — currently only `security_engineer`.
-+
+. First, examine the execution policy. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-execution-policy.rego`. You will see that the policy specifies the authorized user is `security_engineer`.
 
-The output contract is `{"allowed": bool, "violations": [strings]}` — AAP reads `allowed` to gate execution and displays `violations` to the user.
+. We can configure the Policy as code integration into OPA on the platform to ensure policy is checked when we launch a template.
 
 . In AAP Controller, navigate to **Settings → Automation Execution → Policy** and click onthe pencil to edit the settings.
 
-. Configure OPA settings:
+. Click **Edit** and configure:
 +
 
 * OPA Server hostname: `192.168.1.11`
 * Click **save**
 
-. Next navigate to **Access Management → Organizations**, and click on the pencil to edit **Default**. Configure the **Policy Enforcement** path to be: `aap/gateway/decision`.
+. Next navigate to **Access Management → Organizations**, and click on the pencil to edit **Default**. Configure the **Policy Enforcement** path to be: `aap/gateway/decision`. Click **Next** and **Finish**.
 
 This means AAP will query OPA *before* the workflow starts. If OPA returns `allow: false`, the workflow is blocked at the platform level — no playbook code runs at all.
 
-. Test as `admin`: navigate to **Automation Execution → Templates** and try to launch the **Policy-Gated Patching** workflow.
+. Test as `admin`: navigate to **Automation Execution → Templates** and try to launch the **Policy-Gated Patching** workflow. The job will fail, if you select the failed template you will see the authorization error.
 +
 AAP blocks the launch — the policy gate denies `admin`. Note the difference from Exercise 2: the pre-patch check playbook evaluates *system state* (backup, disk, service). The execution policy evaluates *who is requesting the action*. Two layers, two concerns.
 +
@@ -230,14 +214,9 @@ This is the key insight: even though `admin` has full AAP permissions, **the pla
 
 Stay logged in as `security_engineer` — the execution policy you configured in Exercise 4 has already verified your identity. Now the workflow's pre-patch check will evaluate system readiness.
 
-. In AAP Controller, navigate to **Automation Execution → Templates** and find the **Policy-Gated Patching** workflow you just created.
+. You have already executed the workflow.
 
-. Click the rocket icon to **Launch** the workflow.
-
-+
-This time, the policy gate passes — `security_engineer` is in the authorized set. The workflow starts and proceeds to the pre-patch system checks.
-
-. Watch the first node (**CONTAIN - Pre-Patch Check**) execute. It will:
+. Look at the first node (**CONTAIN - Pre-Patch Check**) execute. It will:
 +
 * Gather system facts (backup age, disk space, service health)
 * Send the data to OPA for system-level policy evaluation
@@ -250,24 +229,16 @@ If all system gates pass, the workflow proceeds to the approval node. We expect 
 If the **maintenance_window** gate fails (because the current hour is outside the 6:00–22:00 window), you can adjust it using the **CONTAIN - Update Maintenance Window** job template in AAP. It has a survey that lets you set the start and end hours. This updates the OPA policy in real time without restarting any services.
 ====
 
-+
-[source,role="execute"]
-----
-ssh rhel02 sudo touch /var/log/last-backup-timestamp
-----
-+
-
 . The workflow will **pause** at the **Approve Patch Application** node. You'll see a notification banner in AAP.
 +
-* Navigate to **Views → Jobs** if not already there
-* Click on the **Policy-Gated Patching** workflow job
-* You should see the approval node highlighted and waiting
+* Navigate to **Bell** in the top right of the platform.
+* You should see the **Workflow Approval** waiting
 * Click on the **Approve Patch Application** node
 * Click **Approve** to authorize the patch
 +
 This simulates the Change Advisory Board sign-off. In production, this would typically be a different person or team.
 
-. Watch the workflow proceed through the remaining nodes:
+. Navigate back to Jobs and Watch the workflow proceed through the remaining nodes:
 +
 * **CONTAIN - Patch System** — installs `httpd-2.4.62-1.el9` from the errata repository
 * **CONTAIN - Post-Patch Verify** — confirms {target_cve} is resolved by checking `yum updateinfo`
@@ -315,12 +286,7 @@ ssh rhel01 sudo systemctl status httpd --no-pager
 
 The final workflow node generated an HTML compliance report.
 
-. The compliance report is automatically published to the central compliance portal. Open a browser tab to:
-+
-[source]
-----
-http://central:8086/
-----
+. The compliance report is automatically published to the central compliance portal. Click the **Compliance Portal** tab in the workshop sidebar to view it.
 +
 You should see the report listed on the portal index page. Click the report link to view the full HTML report.
 

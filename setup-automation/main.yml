@@ -142,6 +142,8 @@
     - ../config/secrets.yaml
   vars:
     workshop_repo_dest: /tmp/dcc-workshop
+    guid: "{{ lookup('ansible.builtin.env', 'GUID') }}"
+    domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') }}"
   tasks:
     - name: Configure AAP and EDA
       ansible.builtin.include_tasks: tasks/configure-control.yml

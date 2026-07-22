@@ -32,6 +32,16 @@
           ansible.builtin.set_fact:
             free_disk_gb: "{{ (ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first | int / 1073741824) | round(1) }}"
 
+    - name: Display input values being sent to OPA
+      ansible.builtin.debug:
+        msg: |
+          Policy input for {{ inventory_hostname }}:
+            current_hour: {{ ansible_date_time.hour }}
+            backup_marker_exists: {{ _backup_marker.stat.exists }}
+            backup_age_hours: {{ backup_age_hours }}
+            free_disk_gb: {{ free_disk_gb }}
+            service_state: {{ _service_state.status.ActiveState }}
+
     - name: Query OPA patch policy
       ansible.builtin.uri:
         url: "{{ opa_url }}/v1/data/dcc/patch_policy/result"
@@ -49,7 +59,7 @@
     - name: Display policy gate results
       ansible.builtin.debug:
         msg: |
-          OPA Patch Policy Evaluation:
+          OPA Patch Policy Evaluation for {{ inventory_hostname }}:
           {% for gate_name, gate_result in _opa_response.json.result.gates.items() %}
             {{ 'PASS' if gate_result.pass else 'FAIL' }} | {{ gate_name }}: {{ gate_result.description }}
           {% endfor %}

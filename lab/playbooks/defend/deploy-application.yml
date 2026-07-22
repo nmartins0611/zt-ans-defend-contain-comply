@@ -8,7 +8,7 @@
     target_cve: "CVE-2024-38476"
     target_advisory: "RHSA-2024:5138"
     vulnerable_httpd_version: "2.4.57-5.el9"
-    company_name: "Benekratis Capital"
+    company_name: "Parasol Finance"
     errata_repo_port: 8085
 
   tasks:
@@ -84,7 +84,7 @@
         - /etc/httpd/conf.modules.d/10-h2.conf
         - /etc/httpd/conf.modules.d/10-proxy_h2.conf
 
-    - name: Deploy Benekratis Capital landing page
+    - name: Deploy Parasol Finance landing page
       ansible.builtin.copy:
         content: |
           <!DOCTYPE html>

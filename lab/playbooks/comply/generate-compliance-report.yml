@@ -7,7 +7,7 @@
     report_output_dir: /tmp/compliance-reports
     _target_cve: "{{ target_cve | default('CVE-2024-38476') }}"
     _target_advisory: "{{ target_advisory | default('RHSA-2024:5138') }}"
-    organization: Benekratis Capital
+    organization: Parasol Finance
 
   tasks:
     - name: Ensure report directory exists
@@ -90,7 +90,7 @@
         msg: >-
           Compliance report generated:
           {{ report_output_dir }}/compliance-report-{{ ansible_date_time.date }}.html
-          Portal: http://central:8086/{{ _report_filename }}
+          Portal: {{ compliance_portal_url | default('http://central:8086') }}/{{ _report_filename }}
 
     - name: Set report stats for workflow
       ansible.builtin.set_stats:
@@ -107,7 +107,7 @@
 
   vars:
     compliance_report_dir: /opt/compliance-reports
-    organization: Benekratis Capital
+    organization: Parasol Finance
 
   tasks:
     - name: Find all compliance reports

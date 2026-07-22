@@ -26,8 +26,9 @@
         password: "{{ aap_password }}"
         first_name: Security
         last_name: Engineer
-        email: security_engineer@benekratis.example.com
+        email: security_engineer@parasol.example.com
         is_superuser: false
+        update_secrets: true
         state: present
 
     - name: Grant security_engineer admin role on Default organization
@@ -88,6 +89,10 @@
           target_service: httpd
           target_cve: "{{ target_cve }}"
           target_advisory: "{{ target_advisory }}"
+          compliance_portal_url: >-
+            {{ 'https://compliance-' ~ workshop_guid ~ '.' ~ workshop_domain
+               if (workshop_guid | default('')) | length > 0 and (workshop_domain | default('')) | length > 0
+               else 'http://central:' ~ compliance_portal_port }}
         state: present
 
     - name: Add appservers group
@@ -110,6 +115,14 @@
         inventory: "{{ workshop_inventory_name }}"
         variables:
           ansible_host: "{{ app_server_2_ip | default('rhel02') }}"
+        state: present
+
+    - name: Add central host
+      ansible.controller.host:
+        name: central
+        inventory: "{{ workshop_inventory_name }}"
+        variables:
+          ansible_host: "{{ central_ip | default('central') }}"
         state: present
 
     - name: Add hosts to appservers group
@@ -136,7 +149,7 @@
         extra_vars:
           target_cve: "{{ target_cve }}"
           target_advisory: "{{ target_advisory }}"
-        description: "Module 1: Deploy vulnerable httpd and Benekratis Capital portal"
+        description: "Module 1: Deploy vulnerable httpd and Parasol Finance portal"
         state: present
 
     - name: Create job template -- DEFEND - Scan System
@@ -427,10 +440,10 @@
           - "Policy-Gated Patching"
         state: present
 
-    - name: Grant security_engineer approve role on Policy-Gated Patching
+    - name: Grant security_engineer approval role on Policy-Gated Patching
       ansible.controller.role:
         user: security_engineer
-        role: approve
+        role: approval
         workflows:
           - "Policy-Gated Patching"
         state: present

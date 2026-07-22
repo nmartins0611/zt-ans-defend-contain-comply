@@ -14,7 +14,7 @@ errata_repo_port: 8085
 errata_repo_service_name: dcc-errata-repo
 
 # Workshop scenario
-company_name: Benekratis Capital
+company_name: Parasol Finance
 app_port: 8443
 registry_port: 5000
 
