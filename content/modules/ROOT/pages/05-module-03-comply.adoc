@@ -98,51 +98,23 @@ Click the rocket icon to **Launch**. When prompted for extra variables, ensure `
 audit_phase: pre
 ----
 +
-. Wait for the job to complete. The playbook gathers system facts from the target host, sends them to OPA for evaluation, and writes the results to a JSON file.
+. Wait for the job to complete. The playbook gathers system facts from the target host, sends them to OPA for evaluation, generates an HTML audit report, and pushes it to the compliance portal.
 
-. Review the audit results on rhel01:
+. Click the **Compliance Portal** tab in the workshop sidebar. You should see a new audit report listed (e.g. `rhel01-audit-pre-2026-07-21.html`). Click it to view the full report.
 +
-[source,role="execute"]
-----
-ssh rhel01 'cat /tmp/compliance-reports/audit-results-pre.json | python3 -m json.tool'
-----
+The report shows:
 +
-Each control shows `pass` or `fail` with the control ID and category.
-
-. Check the summary counts:
-+
-[source,role="execute"]
-----
-ssh rhel01 "python3 -c '
-import json
-data = json.load(open(\"/tmp/compliance-reports/audit-results-pre.json\"))
-controls = data.get(\"controls\", [])
-passed = sum(1 for c in controls if c.get(\"pass\"))
-failed = sum(1 for c in controls if not c.get(\"pass\"))
-print(f\"Controls: {passed} passed, {failed} failed, {len(controls)} total\")
-'"
-----
-
-. Identify which controls failed — these are the ones the CIS hardening will remediate:
-+
-[source,role="execute"]
-----
-ssh rhel01 "python3 -c '
-import json
-data = json.load(open(\"/tmp/compliance-reports/audit-results-pre.json\"))
-for c in data.get(\"controls\", []):
-    status = \"PASS\" if c.get(\"pass\") else \"FAIL\"
-    print(f\"  [{status}] {c.get(\"id\", \"unknown\")}: {c.get(\"description\", \"\")}\")
-'"
-----
+* A summary grid with overall status, total controls, passed, and failed counts
+* A **Failed Controls** table highlighting exactly which controls need remediation
+* A **All Controls** table with PASS/FAIL status for every control
 +
 Some controls may already pass from Module 1 hardening (e.g., SELinux). Others require CIS-level remediation.
 
 === Verify
 
-* The audit completed and produced a structured JSON report at `/tmp/compliance-reports/audit-results-pre.json`
+* The audit completed and published an HTML report to the compliance portal
 * You can see which controls passed and which failed
-* The `fail` entries identify exactly what needs to be fixed in the next exercise
+* The failed controls identify exactly what needs to be fixed in the next exercise
 
 == Exercise 3: Apply CIS Hardening
 
@@ -227,50 +199,25 @@ In AAP Controller, launch **COMPLY - Compliance Audit** again. Set the extra var
 audit_phase: post
 ----
 
-. Compare before and after:
+. Click the **Compliance Portal** tab. You should now see both the pre-hardening and post-hardening audit reports. Open both and compare:
 +
-[source,role="execute"]
-----
-ssh rhel01 "python3 -c '
-import json
-for phase in [\"pre\", \"post\"]:
-    data = json.load(open(f\"/tmp/compliance-reports/audit-results-{phase}.json\"))
-    controls = data.get(\"controls\", [])
-    passed = sum(1 for c in controls if c.get(\"pass\"))
-    print(f\"{phase.upper()}-HARDENING: {passed}/{len(controls)} controls passed\")
-'"
-----
+* The **pre-hardening** report shows several failed controls (SSH, kernel, file permissions, services)
+* The **post-hardening** report should show all controls passing — the CIS hardening fixed them
 +
-The post-hardening count should be higher — ideally all controls pass.
+This before/after comparison is the evidence auditors require.
 
 . Generate the full HTML compliance report:
 +
 In AAP Controller, launch **COMPLY - Compliance Report**.
 
-. The report is automatically published to the compliance portal. Click the **Compliance Portal** tab in the workshop sidebar to view it.
-+
-Click the report link for this host and date to view the full HTML report with before/after comparison.
-
-. You can also verify the report was generated locally:
-+
-[source,role="execute"]
-----
-ssh rhel01 ls -la /tmp/compliance-reports/compliance-report-*.html
-----
-
-. Examine the report content to confirm it contains before/after data:
-+
-[source,role="execute"]
-----
-ssh rhel01 'cat /tmp/compliance-reports/compliance-report-$(date +%Y-%m-%d).html | grep -E "Advisory|SELinux|Controls|PASS|FAIL" | head -20'
-----
+. Return to the **Compliance Portal** tab and refresh. You should now see a compliance report alongside the audit reports. Click it to view the full before/after evidence including package versions, SELinux status, firewall configuration, and SSH hardening.
 
 === Verify
 
-* All controls pass in the post-hardening audit
-* The HTML report contains before/after comparison with control-level detail
-* The report includes timestamps, system identifiers, and remediation actions
-* The report is suitable for auditor review
+* All controls pass in the post-hardening audit report
+* The compliance portal shows audit (pre/post) and compliance reports side by side
+* The reports include timestamps, system identifiers, and per-control results
+* All evidence is browsable from the portal — no terminal access needed
 
 == Exercise 5: Build the Hardened Container Image
 
@@ -298,7 +245,7 @@ Review the key security properties:
 +
 [source,role="execute"]
 ----
-ssh rhel01 sudo podman images | grep dcc
+ssh rhel01 sudo podman images
 ----
 +
 You should see an image tagged with the advisory reference.
@@ -320,7 +267,7 @@ for k, v in labels.items():
 +
 [source,role="execute"]
 ----
-ssh rhel01 'sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}" | grep dcc'
+ssh rhel01 'sudo podman images --format "table {{.Repository}} {{.Tag}} {{.Size}}"'
 ----
 
 === Verify
@@ -411,7 +358,7 @@ ssh rhel01 ls -la /tmp/compliance-reports/compliance-report-*.html
 
 echo ""
 echo "=== Container Image ==="
-ssh rhel01 sudo podman images | grep dcc
+ssh rhel01 sudo podman images
 
 echo ""
 echo "=== Registry Catalog ==="

@@ -74,7 +74,7 @@
     - name: Check for known vulnerable packages in image
       ansible.builtin.command:
         cmd: >-
-          podman run --rm --entrypoint=""
+          podman --cgroup-manager=cgroupfs run --rm --entrypoint=""
           {{ registry_url }}/{{ container_name }}:{{ container_tag }}
           rpm -qa --qf '%{NAME}-%{VERSION}-%{RELEASE}\n'
       register: _image_packages

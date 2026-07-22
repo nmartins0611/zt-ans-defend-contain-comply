@@ -10,15 +10,22 @@
     verify_after_push: true
 
   tasks:
-    - name: Ensure local registry is running
-      containers.podman.podman_container:
-        name: workshop-registry
-        image: docker.io/library/registry:2
-        state: started
-        ports:
-          - "5000:5000"
-        volumes:
-          - registry-data:/var/lib/registry
+    - name: Check if registry container is running
+      ansible.builtin.command:
+        cmd: podman --cgroup-manager=cgroupfs inspect --format '{{ '{{' }}.State.Running{{ '}}' }}' workshop-registry
+      register: _registry_running
+      changed_when: false
+      failed_when: false
+
+    - name: Start local registry container
+      ansible.builtin.command:
+        cmd: >-
+          podman --cgroup-manager=cgroupfs run -d
+          --name workshop-registry
+          -p 5000:5000
+          -v registry-data:/var/lib/registry
+          docker.io/library/registry:2
+      when: _registry_running.stdout | default('') != 'true'
       register: _registry_container
 
     - name: Wait for registry to be available
@@ -31,12 +38,10 @@
       until: _registry_health is succeeded
 
     - name: Push image to local registry
-      containers.podman.podman_image:
-        name: "{{ registry_url }}/{{ container_name }}"
-        tag: "{{ container_tag }}"
-        push: true
-        push_args:
-          dest: "{{ registry_url }}/{{ container_name }}:{{ container_tag }}"
+      ansible.builtin.command:
+        cmd: >-
+          podman --cgroup-manager=cgroupfs push
+          {{ registry_url }}/{{ container_name }}:{{ container_tag }}
       register: _push_result
 
     - name: Verify image exists in registry
@@ -55,12 +60,12 @@
       when: verify_after_push | bool
 
     - name: Run container to verify it serves content
-      containers.podman.podman_container:
-        name: "{{ container_name }}-verify"
-        image: "{{ registry_url }}/{{ container_name }}:{{ container_tag }}"
-        state: started
-        ports:
-          - "8443:8443"
+      ansible.builtin.command:
+        cmd: >-
+          podman --cgroup-manager=cgroupfs run -d
+          --name {{ container_name }}-verify
+          -p 8443:8443
+          {{ registry_url }}/{{ container_name }}:{{ container_tag }}
       register: _verify_container
 
     - name: Wait for application container to respond
@@ -79,9 +84,9 @@
         success_msg: "Application container is serving content correctly."
 
     - name: Remove verification container
-      containers.podman.podman_container:
-        name: "{{ container_name }}-verify"
-        state: absent
+      ansible.builtin.command:
+        cmd: podman --cgroup-manager=cgroupfs rm -f {{ container_name }}-verify
+      changed_when: true
 
     - name: Report push and verification results
       ansible.builtin.debug:
