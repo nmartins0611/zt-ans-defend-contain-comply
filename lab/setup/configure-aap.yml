@@ -431,10 +431,10 @@
           - "Policy-Gated Patching"
         state: present
 
-    - name: Grant security_engineer approve role on Policy-Gated Patching
+    - name: Grant security_engineer approval role on Policy-Gated Patching
       ansible.controller.role:
         user: security_engineer
-        role: approve
+        role: approval
         workflows:
           - "Policy-Gated Patching"
         state: present
