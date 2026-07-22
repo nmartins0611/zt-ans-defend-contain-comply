@@ -40,7 +40,7 @@
     - name: Push image to local registry
       ansible.builtin.command:
         cmd: >-
-          podman --cgroup-manager=cgroupfs push
+          podman --cgroup-manager=cgroupfs push --tls-verify=false
           {{ registry_url }}/{{ container_name }}:{{ container_tag }}
       register: _push_result
 
