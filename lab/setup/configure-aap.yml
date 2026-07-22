@@ -28,6 +28,7 @@
         last_name: Engineer
         email: security_engineer@parasol.example.com
         is_superuser: false
+        update_secrets: true
         state: present
 
     - name: Grant security_engineer admin role on Default organization
