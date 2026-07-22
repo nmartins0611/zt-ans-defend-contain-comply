@@ -30,7 +30,26 @@ By the end of this module, you'll be able to:
 
 Before running the audit, examine the policies that define Parasol Finance's security baselines.
 
-. From the terminal, list the OPA policy bundles:
+. Open the *Gitea* tab and navigate to `lab/setup/files/opa-policies/dcc-compliance.rego`. Read through the Rego policy carefully.
++
+Notice the structure:
++
+* Each control is a separate Rego rule (e.g. `selinux_enforcing`, `ssh_root_login_disabled`)
+* Every rule has a `default := false` declaration — if the condition isn't met, the control fails
+* The `controls` array assembles all rules into a structured list with IDs, names, and categories
+* The `result` object returns the overall compliance status, pass/fail counts, and per-control details
+
+. Identify the 13 controls and their categories:
++
+* **SELinux** — Is enforcement mode active?
+* **Firewall** — Is firewalld running?
+* **SSH** — Root login, X11 forwarding, max auth tries, idle timeout
+* **Kernel** — ICMP redirects, send redirects, ASLR
+* **File permissions** — `/etc/passwd`, `/etc/shadow`
+* **Services** — Unnecessary services (`rpcbind`) should be disabled
+* **Vulnerability** — No open CVEs
+
+. From the terminal, verify OPA has the compliance policy loaded:
 +
 [source,role="execute"]
 ----
@@ -42,26 +61,9 @@ for p in data.get('result', []):
 "
 ----
 +
-You should see policies covering SELinux, firewall, SSH, services, and kernel parameters.
+You should see `policies/dcc-compliance.rego` in the list.
 
-. Examine the full compliance policy (the policy ID uses the file path, not the Rego package name):
-+
-[source,role="execute"]
-----
-curl -s http://central:8181/v1/policies/policies%2Fdcc-compliance.rego | python3 -m json.tool
-----
-+
-Note the 13 controls: each evaluates a specific security baseline and returns pass/fail.
-
-. Take a moment to identify the categories covered:
-+
-* **SELinux** — Is enforcement mode active?
-* **SSH** — Root login, X11 forwarding, max auth tries, idle timeout
-* **File permissions** — `/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/gshadow`
-* **Kernel** — ICMP redirects, ASLR (address space layout randomization)
-* **Services** — Unnecessary services (`rpcbind`, `avahi-daemon`) should be disabled
-
-. You can also query a single control to see its evaluation logic. For example, test the SELinux control:
+. Test a single control to see how the input/output contract works:
 +
 [source,role="execute"]
 ----
@@ -70,12 +72,12 @@ curl -s -X POST http://central:8181/v1/data/dcc/compliance/result \
   -d '{"input": {"selinux_mode": "Enforcing"}}' | python3 -m json.tool
 ----
 +
-Try changing `"Enforcing"` to `"Permissive"` and see how the result changes.
+Try changing `"Enforcing"` to `"Permissive"` and see how the result changes. Ansible provides the full set of system facts as input; OPA returns pass/fail per control.
 
 === Verify
 
-* OPA has loaded policy bundles that define auditable security baselines
-* You can identify the 13 controls and their categories
+* The compliance policy is loaded in OPA (`policies/dcc-compliance.rego`)
+* You can identify the 13 controls and their categories in the Rego source
 * You understand the input/output contract: Ansible provides system facts, OPA returns pass/fail per control
 
 == Exercise 2: Run the Pre-Hardening Compliance Audit
