@@ -63,7 +63,7 @@
       ansible.builtin.command:
         cmd: >-
           podman --cgroup-manager=cgroupfs run -d
-          --name {{ container_name }}-verify
+          --replace --name {{ container_name }}-verify
           -p 8443:8443
           {{ registry_url }}/{{ container_name }}:{{ container_tag }}
       register: _verify_container
