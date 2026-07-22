@@ -389,7 +389,7 @@ The AAP credential, project, and decision environment are already configured. Yo
 
 . Open the **Splunk** tab and navigate to **Apps → Event Driven Ansible Add-on for Splunk → Configuration**.
 
-.When adding the URL into the plugin, please note you need to remove aap.example.org from the URL due to the workshop environment, use 192.168.1.10 instead.
+. When adding the URL into the plugin, please note you need to remove aap.example.org from the URL due to the workshop environment, use 192.168.1.10 instead.
 
 . Click **Add**:
 +
@@ -433,16 +433,6 @@ Now deploy the same vulnerable application to a second server.
 
 . Click the **Portal - rhel02** tab and confirm the portal is now up and accessible.
 
-. Open the **Splunk** tab and run the search again:
-+
-[source]
-----
-index=main sourcetype=linux_secure "CVE-2024-38476" | stats count by host, source | where count > 0
-----
-+
-You should now see events for **both** `rhel01` and `rhel02`.
-
-==== Verify
 
 * The DEFEND - Deploy Application job completed successfully
 * The Parasol Finance Portal on rhel02 is accessible
