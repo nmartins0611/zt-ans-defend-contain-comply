@@ -117,6 +117,14 @@
           ansible_host: "{{ app_server_2_ip | default('rhel02') }}"
         state: present
 
+    - name: Add central host
+      ansible.controller.host:
+        name: central
+        inventory: "{{ workshop_inventory_name }}"
+        variables:
+          ansible_host: "{{ central_ip | default('central') }}"
+        state: present
+
     - name: Add hosts to appservers group
       ansible.controller.group:
         name: appservers
